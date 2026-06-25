@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Captura de Libros</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/interfaz.css">
+  <!-- Cargar CDN de Iconify para iconos modernos -->
+  <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+</head>
+<body>
+  <div id="contenedor-aplicacion">
+    <!-- Encabezado de la Aplicación -->
+    <header class="encabezado-app">
+      <div class="logo">
+        <span class="icono">
+          <iconify-icon icon="mdi:book-open-page-variant" style="color: #38bdf8;"></iconify-icon>
+        </span>
+        <h1>CapturaLibros</h1>
+      </div>
+      <div class="controles-cabecera">
+        <!-- Interruptor de Tema (Modo Claro / Modo Oscuro) -->
+        <button class="btn-tema" id="btn-tema" title="Alternar tema de colores">
+          <iconify-icon icon="mdi:weather-night" id="icono-tema"></iconify-icon>
+        </button>
+        <div class="estado-sistema" id="estado-conexion">
+          <span class="punto-conexion inactivo"></span>
+          <span id="texto-conexion">Desconectado</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- PANTALLA 1: Formulario de Login Simulado -->
+    <main class="pantalla seccion-login" id="seccion-login">
+      <div class="tarjeta-login">
+        <div class="login-cabecera">
+          <h2>Iniciar Sesión</h2>
+          <p>Ingresa al sistema local de procesamiento de libros</p>
+        </div>
+        
+        <form id="formulario-login">
+          <div class="grupo-formulario">
+            <label for="input-usuario">Usuario</label>
+            <input type="text" id="input-usuario" placeholder="Ej: usuario" required autocomplete="off">
+          </div>
+          
+          <div class="grupo-formulario">
+            <label for="input-contrasena">Contraseña</label>
+            <input type="password" id="input-contrasena" placeholder="••••••••" required>
+          </div>
+
+          <div class="error-login" id="error-login"></div>
+
+          <button type="submit" class="btn-accion">
+            <span>Ingresar</span>
+            <iconify-icon icon="mdi:arrow-right" class="flecha"></iconify-icon>
+          </button>
+        </form>
+      </div>
+    </main>
+
+    <!-- PANTALLA 2: Panel de Captura Principal (Oculto Inicialmente) -->
+    <main class="pantalla seccion-captura oculto" id="seccion-captura">
+      
+      <!-- Panel Lateral Izquierdo: Lista de Archivos -->
+      <aside class="panel-lateral-lista">
+        <div class="panel-titulo">Cola de PDFs</div>
+        <div class="lista-archivos" id="lista-archivos-contenedor">
+          <!-- Se llena dinámicamente desde js/cliente.js -->
+        </div>
+      </aside>
+
+      <!-- Panel Central: Previsualizador del PDF Real -->
+      <section class="panel-central-visor" id="panel-central-visor">
+        <!-- Placeholder cuando no hay archivo cargado -->
+        <div class="placeholder-visor" id="visor-placeholder">
+          <iconify-icon icon="mdi:file-pdf-box" class="icono-grande-pdf"></iconify-icon>
+          <h3>Ningún PDF seleccionado</h3>
+          <p>Selecciona un archivo de la lista de la izquierda para comenzar a trabajar en el visor.</p>
+        </div>
+
+        <!-- Visor de PDF Real mediante iframe -->
+        <div class="visor-activo oculto" id="visor-activo">
+          <div class="visor-cabecera">
+            <span id="visor-titulo-doc">nombre_archivo.pdf</span>
+            <span>Visor Documento</span>
+          </div>
+          <div class="visor-pdf-real">
+            <iframe id="iframe-visor-pdf" src="" width="100%" height="100%" style="border:none;"></iframe>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel Lateral Derecho: Lógica de Captura y Reglas -->
+      <aside class="panel-lateral-captura">
+        <div class="panel-titulo">Control de Captura</div>
+        
+        <div class="panel-cuerpo">
+          <!-- Caja de la Regla de Ejemplo -->
+          <div class="caja-regla">
+            <h4>
+              <iconify-icon icon="mdi:information-outline" style="color: #38bdf8;"></iconify-icon>
+              Regla del Lote
+            </h4>
+            <p id="texto-regla-ejemplo">Cargando regla de ejemplo...</p>
+          </div>
+
+          <!-- Campos de Edición -->
+          <div class="panel-controles">
+            <div class="grupo-formulario">
+              <label for="input-nuevo-nombre">Nombre sugerido (Editar)</label>
+              <input type="text" id="input-nuevo-nombre" placeholder="Nombre final del archivo" autocomplete="off">
+            </div>
+
+            <button class="btn-accion" id="btn-renombrar">
+              <iconify-icon icon="mdi:rename-box"></iconify-icon>
+              <span>Renombrar PDF</span>
+            </button>
+            
+            <button class="btn-accion btn-secundario" id="btn-recortar">
+              <iconify-icon icon="mdi:content-cut"></iconify-icon>
+              <span>Recortar Página</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+    </main>
+
+    <!-- Pie de Página -->
+    <footer class="pie-app">
+      <p>&copy; 2026 CapturaLibros - Estructura Vanilla y Procesamiento Local</p>
+    </footer>
+  </div>
+
+  <script src="js/cliente.js"></script>
+</body>
+</html>
