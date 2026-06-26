@@ -73,35 +73,26 @@
       
       <!-- Panel Lateral Izquierdo: Controles y Acciones -->
       <aside class="panel-lateral-lista">
-        <div class="panel-titulo">Captura y Renombrado</div>
+        <div class="panel-titulo">Captura de Libros</div>
 
         <!-- Panel de Controles de Captura Integrado -->
         <div class="panel-controles-captura">
-          <!-- Caja de la regla del lote (siempre visible) -->
-          <div class="caja-regla-desplegable" id="caja-regla-desplegable">
-            <h4>Regla del Lote:</h4>
-            <p id="texto-regla-ejemplo">Cargando regla...</p>
-          </div>
-
-          <div class="grupo-formulario-lateral">
-            <div class="cabecera-label-lateral">
-              <label for="input-nuevo-nombre">Nombre sugerido</label>
-            </div>
-            <input type="text" id="input-nuevo-nombre" placeholder="Nombre sugerido" autocomplete="off">
-          </div>
-
           <div class="botones-menu-acciones">
-            <button class="btn-menu-accion" id="btn-menu-renombrar" title="Renombrar el PDF de forma física en red">
-              <iconify-icon icon="mdi:rename-box"></iconify-icon>
-              <span>Renombrar PDF</span>
-            </button>
             <button class="btn-menu-accion" id="btn-menu-recortar" title="Activar/Aplicar recorte geométrico de página">
-              <iconify-icon icon="mdi:content-cut"></iconify-icon>
+              <iconify-icon icon="mdi:crop"></iconify-icon>
               <span>Recortar Página</span>
+            </button>
+            <button class="btn-menu-accion oculto" id="btn-menu-cancelar-recorte" title="Cancelar el recorte y ocultar las guías">
+              <iconify-icon icon="mdi:close-circle-outline"></iconify-icon>
+              <span>Cancelar Recorte</span>
             </button>
             <button class="btn-menu-accion" id="btn-menu-cortar" title="Entrar a vista de miniaturas y guardar selección">
               <iconify-icon icon="mdi:file-multiple-outline"></iconify-icon>
-              <span>Cortar PDF</span>
+              <span>Crear PDF</span>
+            </button>
+            <button class="btn-menu-accion oculto" id="btn-menu-cancelar-crear" title="Cancelar la creación de PDF y regresar al visor">
+              <iconify-icon icon="mdi:close-circle-outline"></iconify-icon>
+              <span>Cancelar Creación</span>
             </button>
           </div>
         </div>
@@ -184,6 +175,35 @@
     <footer class="pie-app">
       <p>&copy; 2026 Captura de Libros - Estructura Vanilla y Procesamiento Local</p>
     </footer>
+  </div>
+
+  <!-- Modal para Crear PDF (Nombre y Regla del Lote) -->
+  <div id="modal-crear-pdf" class="modal-overlay oculto">
+    <div class="modal-contenido">
+      <h3>Crear Nuevo PDF</h3>
+      
+      <!-- Regla del lote en el modal -->
+      <div class="caja-regla-desplegable" id="modal-caja-regla">
+        <h4>Regla del Lote:</h4>
+        <p id="modal-texto-regla-ejemplo">Cargando regla...</p>
+      </div>
+      
+      <div class="grupo-formulario-modal">
+        <label for="modal-input-nombre">Nombre del nuevo archivo</label>
+        <input type="text" id="modal-input-nombre" placeholder="Ej: 00123" autocomplete="off">
+      </div>
+
+      <!-- Contenedor para mensajes de error del modal -->
+      <div class="error-modal oculto" id="modal-error-mensaje">
+        <iconify-icon icon="mdi:alert-circle-outline"></iconify-icon>
+        <span id="modal-error-texto">Error al validar el nombre.</span>
+      </div>
+      
+      <div class="modal-botones">
+        <button id="btn-modal-cancelar" class="btn-secundario">Cancelar</button>
+        <button id="btn-modal-aceptar" class="btn-primario">Crear PDF</button>
+      </div>
+    </div>
   </div>
 
   <script src="js/cliente.js"></script>

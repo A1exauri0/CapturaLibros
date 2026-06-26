@@ -72,7 +72,8 @@ function estructurarPdf(nombre, rutaCompleta, metadatos, capturista, fecha) {
 }
 
 /**
- * Obtiene la lista de PDFs de la red segun el usuario activo y todas las carpetas de fecha
+/**
+ * Obtiene la lista de PDFs de la red según el usuario activo y todas las carpetas de fecha
  * @param {object} usuarioActivo Usuario activo logueado en la app
  * @returns {Promise<Array>} Lista de PDFs estructurados
  */

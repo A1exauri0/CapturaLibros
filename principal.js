@@ -8,6 +8,7 @@ const { validarUsuario } = require('./servicios/autenticacion');
 const { obtenerPdfsDeRed, renombrarArchivoPdf } = require('./servicios/gestorArchivos');
 const { cortarPaginasPdf, recortarMargenesPagina } = require('./servicios/procesamientoPdf');
 const { reportarAuditoria } = require('./servicios/auditoria');
+const { verificarYActualizar } = require('./servicios/actualizador');
 
 let usuarioActivo = null;
 
@@ -22,12 +23,15 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 function crearVentana() {
-  // Crear la ventana de Electron con un diseño compacto para el Login
+  // Crear la ventana de Electron directamente con tamaño grande y maximizada
   ventanaPrincipal = new BrowserWindow({
-    width: 440,
-    height: 540,
-    resizable: false,
-    maximizable: false,
+    width: 1300,
+    height: 850,
+    minWidth: 1024,
+    minHeight: 768,
+    resizable: true,
+    maximizable: true,
+    icon: path.join(__dirname, 'assets/libros.png'),
     webPreferences: {
       preload: path.join(__dirname, 'precarga.js'),
       contextIsolation: true,
@@ -39,6 +43,9 @@ function crearVentana() {
 
   // Cargar directamente el index.html local
   ventanaPrincipal.loadFile(path.join(__dirname, 'index.html'));
+
+  // Maximizar la ventana desde el inicio
+  ventanaPrincipal.maximize();
 
   // Descomentar si se desea depurar el frontend directamente
   // ventanaPrincipal.webContents.openDevTools();
@@ -70,6 +77,13 @@ app.whenReady().then(() => {
 
   crearVentana();
 
+  // Verificar actualización automática al iniciar la aplicación (con pequeño retraso)
+  setTimeout(() => {
+    verificarYActualizar().catch(error => {
+      console.error('Error al verificar la actualización:', error.message);
+    });
+  }, 1000);
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       crearVentana();
@@ -97,16 +111,6 @@ ipcMain.handle('iniciar-sesion', async (evento, datos) => {
       NombreCompleto: respuesta.usuario.nombreCompleto,
       Turno: respuesta.usuario.turno
     };
-    
-    // Maximizar la ventana para la interfaz de trabajo
-    if (ventanaPrincipal) {
-      ventanaPrincipal.setResizable(true);
-      ventanaPrincipal.setMaximizable(true);
-      ventanaPrincipal.setMinimumSize(1024, 768);
-      ventanaPrincipal.setSize(1300, 850);
-      ventanaPrincipal.center();
-      ventanaPrincipal.maximize();
-    }
   }
   return respuesta;
 });
@@ -114,15 +118,6 @@ ipcMain.handle('iniciar-sesion', async (evento, datos) => {
 // 2. Cerrar sesión activa
 ipcMain.handle('cerrar-sesion', () => {
   usuarioActivo = null;
-  
-  // Regresar al tamaño de ventana de login
-  if (ventanaPrincipal) {
-    ventanaPrincipal.setResizable(false);
-    ventanaPrincipal.setMaximizable(false);
-    ventanaPrincipal.unmaximize();
-    ventanaPrincipal.setSize(440, 540);
-    ventanaPrincipal.center();
-  }
   return { exito: true };
 });
 
