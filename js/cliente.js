@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Elementos de la interfaz de Captura
   const seccionCaptura = document.getElementById('seccion-captura');
-  const listaArchivosContenedor = document.getElementById('lista-archivos-contenedor');
+  const listaArchivosContenedor = null; // Removido del DOM
   
   // Elementos del Visor de PDF con PDF.js (Vista Individual)
   const visorPlaceholder = document.getElementById('visor-placeholder');
@@ -25,15 +25,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   const contenedorLienzoPdf = document.getElementById('contenedor-lienzo-pdf');
   const lienzoEnvoltura = document.getElementById('lienzo-envoltura');
   const capaRecorteInteractiva = document.getElementById('capa-recorte-interactiva');
-  const btnTrazarRecorte = document.getElementById('btn-trazar-recorte');
+  const btnTrazarRecorte = null; // Integrado a la izquierda
+  const cargadorVisor = document.getElementById('cargador-visor');
+ 
+  // Botones del Menú Lateral Unificado
+  const btnMenuRenombrar = document.getElementById('btn-menu-renombrar');
+  const btnMenuRecortar = document.getElementById('btn-menu-recortar');
+  const btnMenuCortar = document.getElementById('btn-menu-cortar');
+  const cajaReglaDesplegable = document.getElementById('caja-regla-desplegable');
 
-  // Pestañas de Alternancia de Modos (Recortar PDF y Crear PDF)
-  const pestanaPagina = document.getElementById('pestana-pagina');
-  const pestanaMiniaturas = document.getElementById('pestana-miniaturas');
   const visorControlesBarra = document.getElementById('visor-controles-barra');
   const contenedorRejillaMiniaturas = document.getElementById('contenedor-rejilla-miniaturas');
   const rejillaMiniaturasPdf = document.getElementById('rejilla-miniaturas-pdf');
-
+ 
   // Controles de Paginación y Zoom del Visor (Vista Individual)
   const btnAnt = document.getElementById('btn-ant');
   const btnSig = document.getElementById('btn-sig');
@@ -43,12 +47,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnZoomOut = document.getElementById('btn-zoom-out');
   const textoZoom = document.getElementById('texto-zoom');
   const btnRotar = document.getElementById('btn-rotar');
-
+ 
   // Elementos del Panel de Control
   const inputNuevoNombre = document.getElementById('input-nuevo-nombre');
   const textoReglaEjemplo = document.getElementById('texto-regla-ejemplo');
-  const btnRenombrar = document.getElementById('btn-renombrar');
-  const btnRecortar = document.getElementById('btn-recortar');
+  const btnRenombrar = null; // Reemplazado por btnMenuRenombrar
+  const btnRecortar = null;  // Reemplazado por btnMenuRecortar
 
   // Elementos de Conexión (Omitidos)
   const indicadorConexion = null;
@@ -114,12 +118,60 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Lógica de conexión local eliminada
 
   // ==========================================================================
-  // OMITIR PANTALLA DE LOGIN (ACCESO DIRECTO)
+  // INICIO DE SESIÓN REAL CON RED LOCAL
   // ==========================================================================
-  if (seccionLogin && seccionCaptura) {
-    seccionLogin.classList.add('oculto');
-    seccionCaptura.classList.remove('oculto');
-    inicializarCapturaPDFs();
+  if (formularioLogin) {
+    formularioLogin.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const usuarioVal = inputUsuario.value.trim();
+      const contrasenaVal = inputContrasena.value.trim();
+
+      if (!usuarioVal || !contrasenaVal) {
+        errorLogin.textContent = 'Por favor, ingresa el usuario y el PIN.';
+        return;
+      }
+
+      if (window.apiProyecto && typeof window.apiProyecto.iniciarSesion === 'function') {
+        try {
+          errorLogin.textContent = '';
+          const botonSubmit = formularioLogin.querySelector('button[type="submit"]');
+          botonSubmit.disabled = true;
+          const textoOriginalBtn = botonSubmit.innerHTML;
+          botonSubmit.innerHTML = `<span>Validando...</span>`;
+
+          const respuesta = await window.apiProyecto.iniciarSesion({
+            usuario: usuarioVal,
+            pin: contrasenaVal
+          });
+
+          botonSubmit.disabled = false;
+          botonSubmit.innerHTML = textoOriginalBtn;
+
+          if (respuesta.exito) {
+            console.log('Autenticación correcta:', respuesta.usuario);
+            
+            // Quitar clase de login para mostrar interfaz completa
+            document.body.classList.remove('en-login');
+            
+            // Ocultar login y mostrar panel de captura
+            seccionLogin.classList.add('oculto');
+            seccionCaptura.classList.remove('oculto');
+            
+            // Inicializar la carga de PDFs reales
+            inicializarCapturaPDFs();
+          } else {
+            errorLogin.textContent = respuesta.mensaje;
+          }
+        } catch (err) {
+          console.error('Error al iniciar sesión:', err);
+          errorLogin.textContent = 'Error de comunicación local con el servidor.';
+          formularioLogin.querySelector('button[type="submit"]').disabled = false;
+        }
+      } else {
+        errorLogin.textContent = 'Error: API del proyecto no disponible.';
+      }
+    });
   }
 
   // ==========================================================================
@@ -134,64 +186,74 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function cargarListaPDFs() {
     if (window.apiProyecto && typeof window.apiProyecto.obtenerPDFs === 'function') {
       try {
+        // Mostrar cargador en el visor mientras escanea la red
+        if (cargadorVisor) {
+          cargadorVisor.classList.remove('oculto');
+          const textoCarga = document.getElementById('cargador-visor-texto');
+          if (textoCarga) textoCarga.textContent = 'Buscando libros en la red...';
+        }
+        
         archivosPdfs = await window.apiProyecto.obtenerPDFs();
-        renderizarListaArchivos();
+        
+        // Ocultar cargador de búsqueda
+        if (cargadorVisor) {
+          cargadorVisor.classList.add('oculto');
+        }
+
+        // Buscar el primer PDF no procesado en el lote de red
+        const pdfNoProcesado = archivosPdfs.find(archivo => !archivo.procesado);
+        if (pdfNoProcesado) {
+          seleccionarArchivo(pdfNoProcesado);
+        } else {
+          limpiarVisorYMostrarPlaceholder();
+        }
       } catch (error) {
         console.error('Error al obtener PDFs por IPC:', error);
-        listaArchivosContenedor.innerHTML = '<p style="padding: 10px; font-size:12px; color:var(--color-error)">Error al cargar archivos.</p>';
+        if (cargadorVisor) {
+          cargadorVisor.classList.add('oculto');
+        }
+        alert('Error de red al consultar la carpeta de PDFs.');
       }
     }
   }
 
-  // Renderizar la barra lateral
-  function renderizarListaArchivos() {
-    listaArchivosContenedor.innerHTML = '';
+  // Limpiar el visor y mostrar un estado completado cuando no queden PDFs
+  function limpiarVisorYMostrarPlaceholder() {
+    archivoSeleccionado = null;
+    pdfDocumento = null;
+    paginaActiva = 1;
+    paginasSeleccionadas.clear();
+    desactivarHerramientaRecorte();
 
-    if (archivosPdfs.length === 0) {
-      listaArchivosContenedor.innerHTML = `
-        <div style="padding: 16px; text-align: center; color: var(--color-texto-secundario); font-size: 13px;">
-          <iconify-icon icon="mdi:folder-alert-outline" style="font-size: 32px; color: var(--color-alerta); margin-bottom: 8px;"></iconify-icon>
-          <p>No se encontraron PDFs en la carpeta <b>/pdfs</b> del proyecto.</p>
-          <p style="margin-top: 6px; font-size: 11px;">Coloca archivos PDF allí y se listarán aquí.</p>
-        </div>
-      `;
-      return;
+    // Mostrar placeholder y ocultar visor activo
+    if (visorPlaceholder) {
+      visorPlaceholder.classList.remove('oculto');
+      const placeholderTitulo = visorPlaceholder.querySelector('h3');
+      const placeholderTexto = visorPlaceholder.querySelector('p');
+      if (placeholderTitulo && placeholderTexto) {
+        placeholderTitulo.textContent = '¡Todos los PDFs procesados!';
+        placeholderTexto.textContent = 'No quedan más libros PDF pendientes de procesar en la red local.';
+      }
+    }
+    if (visorActivo) {
+      visorActivo.classList.add('oculto');
+    }
+    
+    // Limpiar input de nombre
+    if (inputNuevoNombre) {
+      inputNuevoNombre.value = '';
     }
 
-    archivosPdfs.forEach(archivo => {
-      const elementoItem = document.createElement('div');
-      elementoItem.className = `item-archivo ${archivo.procesado ? 'procesado' : ''} ${archivoSeleccionado && archivoSeleccionado.id === archivo.id ? 'activo' : ''}`;
-      
-      const megabytes = (archivo.tamanioBytes / (1024 * 1024)).toFixed(2);
-
-      elementoItem.innerHTML = `
-        <iconify-icon icon="mdi:file-pdf-box" class="icono-archivo-pdf"></iconify-icon>
-        <div class="info-doc">
-          <h4>${archivo.nombre}</h4>
-          <p>${megabytes} MB</p>
-        </div>
-        <span class="check-doc">
-          <iconify-icon icon="mdi:check-circle"></iconify-icon>
-        </span>
-      `;
-
-      elementoItem.addEventListener('click', () => {
-        seleccionarArchivo(archivo);
-      });
-
-      listaArchivosContenedor.appendChild(elementoItem);
-    });
+    actualizarMenuLateral();
   }
 
   function desactivarHerramientaRecorte() {
     herramientaRecorteActiva = false;
-    if (btnTrazarRecorte) {
-      btnTrazarRecorte.classList.remove('activo');
-    }
     if (capaRecorteInteractiva) {
       capaRecorteInteractiva.classList.remove('activa');
     }
     eliminarElementosRecorte();
+    actualizarMenuLateral();
   }
 
   // Seleccionar y cargar el PDF
@@ -205,9 +267,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Activar modo Recortar por defecto al abrir un PDF
     activarModo('recortar');
-
-    // Marcar como activo en la lista
-    renderizarListaArchivos();
 
     // Mostrar visor y ocultar placeholder
     visorPlaceholder.classList.add('oculto');
@@ -235,6 +294,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ==========================================================================
   async function cargarYRenderizarPDF(url) {
     try {
+      // Mostrar el cargador de visor
+      if (cargadorVisor) {
+        cargadorVisor.classList.remove('oculto');
+      }
       const loadingTask = pdfjsLib.getDocument({
         url: url,
         disableRange: true,
@@ -250,6 +313,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       await renderizarPagina(paginaActiva);
       actualizarEstadoBotonesVisor();
     } catch (error) {
+      if (cargadorVisor) cargadorVisor.classList.add('oculto');
       console.error('Error al cargar documento con PDF.js:', error);
       alert('Error: No se pudo renderizar el PDF local.');
     }
@@ -259,6 +323,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!pdfDocumento) return;
 
     try {
+      // Mostrar el cargador
+      if (cargadorVisor) {
+        cargadorVisor.classList.remove('oculto');
+      }
       // Eliminar elementos de recorte antes de repintar la página
       eliminarElementosRecorte();
 
@@ -292,7 +360,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (herramientaRecorteActiva) {
         inicializarGuiasRecorte();
       }
+
+      // Ocultar el cargador al finalizar el render
+      if (cargadorVisor) {
+        cargadorVisor.classList.add('oculto');
+      }
     } catch (error) {
+      if (cargadorVisor) {
+        cargadorVisor.classList.add('oculto');
+      }
       console.error('Error al renderizar página:', error);
     }
   }
@@ -304,15 +380,73 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================================================
-  // GESTIÓN DE MODOS DE TRABAJO (RECORTE GEOMÉTRICO VS CREACIÓN/EXTRACCIÓN)
+  // GESTIÓN DE MODOS DE TRABAJO Y MENÚ LATERAL IZQUIERDO UNIFICADO
   // ==========================================================================
+  function actualizarMenuLateral() {
+    if (!archivoSeleccionado) {
+      if (btnMenuRenombrar) btnMenuRenombrar.disabled = true;
+      if (btnMenuRecortar) btnMenuRecortar.disabled = true;
+      if (btnMenuCortar) btnMenuCortar.disabled = true;
+      
+      if (btnMenuRenombrar) btnMenuRenombrar.classList.remove('activo', 'ejecutar');
+      if (btnMenuRecortar) btnMenuRecortar.classList.remove('activo', 'ejecutar');
+      if (btnMenuCortar) btnMenuCortar.classList.remove('activo', 'ejecutar');
+      
+      if (btnMenuRecortar) btnMenuRecortar.querySelector('span').textContent = 'Recortar';
+      if (btnMenuCortar) btnMenuCortar.querySelector('span').textContent = 'Cortar PDF';
+      return;
+    }
+
+    if (btnMenuRenombrar) btnMenuRenombrar.disabled = false;
+    if (btnMenuRecortar) btnMenuRecortar.disabled = false;
+    if (btnMenuCortar) btnMenuCortar.disabled = false;
+
+    // 1. Botón Renombrar (Acción directa siempre)
+    if (btnMenuRenombrar) btnMenuRenombrar.classList.remove('activo', 'ejecutar');
+
+    // 2. Botón Recortar
+    if (btnMenuRecortar) {
+      if (modoActual === 'recortar') {
+        btnMenuRecortar.classList.add('activo');
+        if (herramientaRecorteActiva) {
+          btnMenuRecortar.classList.add('ejecutar');
+          btnMenuRecortar.querySelector('span').textContent = 'Aplicar Recorte';
+        } else {
+          btnMenuRecortar.classList.remove('ejecutar');
+          btnMenuRecortar.querySelector('span').textContent = 'Iniciar Recorte';
+        }
+      } else {
+        btnMenuRecortar.classList.remove('activo', 'ejecutar');
+        btnMenuRecortar.querySelector('span').textContent = 'Recortar';
+      }
+    }
+
+    // 3. Botón Cortar
+    if (btnMenuCortar) {
+      if (modoActual === 'crear') {
+        btnMenuCortar.classList.add('activo');
+        const totalSeleccionadas = paginasSeleccionadas.size;
+        if (totalSeleccionadas > 0) {
+          btnMenuCortar.classList.add('ejecutar');
+          btnMenuCortar.querySelector('span').textContent = `Crear PDF (${totalSeleccionadas})`;
+        } else {
+          btnMenuCortar.classList.remove('ejecutar');
+          btnMenuCortar.querySelector('span').textContent = 'Seleccionar Hojas';
+        }
+      } else {
+        btnMenuCortar.classList.remove('activo', 'ejecutar');
+        btnMenuCortar.querySelector('span').textContent = 'Cortar PDF';
+      }
+    }
+  }
+
+
+
   function activarModo(modo) {
     modoActual = modo;
     desactivarHerramientaRecorte();
     
     if (modo === 'recortar') {
-      pestanaPagina.classList.add('activa');
-      pestanaMiniaturas.classList.remove('activa');
       contenedorLienzoPdf.classList.remove('oculto');
       visorControlesBarra.classList.remove('oculto');
       contenedorRejillaMiniaturas.classList.add('oculto');
@@ -320,8 +454,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Mostrar caja de recorte si existiera
       mostrarCajaRecorteElemento();
     } else {
-      pestanaMiniaturas.classList.add('activa');
-      pestanaPagina.classList.remove('activa');
       contenedorLienzoPdf.classList.add('oculto');
       visorControlesBarra.classList.add('oculto');
       contenedorRejillaMiniaturas.classList.remove('oculto');
@@ -334,11 +466,72 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     actualizarNombreSugerido();
-    actualizarBotonesControl();
+    actualizarMenuLateral();
   }
 
-  pestanaPagina.addEventListener('click', () => activarModo('recortar'));
-  pestanaMiniaturas.addEventListener('click', () => activarModo('crear'));
+  // Listeners de los botones del menú lateral para alternar modos e iniciar/confirmar acciones
+  if (btnMenuRecortar) {
+    btnMenuRecortar.addEventListener('click', () => {
+      if (!archivoSeleccionado) return;
+
+      if (modoActual !== 'recortar') {
+        activarModo('recortar');
+        // Activar guías automáticamente al entrar
+        alternarHerramientaRecorte(true);
+      } else {
+        // Si ya está en modo recortar, alternar la herramienta o ejecutar la confirmación si las guías están activas
+        if (!herramientaRecorteActiva) {
+          alternarHerramientaRecorte(true);
+        } else {
+          // Ejecutar el recorte
+          ejecutarRecorteGeometrico();
+        }
+      }
+    });
+  }
+
+  if (btnMenuCortar) {
+    btnMenuCortar.addEventListener('click', () => {
+      if (!archivoSeleccionado) return;
+
+      if (modoActual !== 'crear') {
+        activarModo('crear');
+      } else {
+        // Si ya está en modo crear y hay páginas seleccionadas, proceder con la acción
+        if (paginasSeleccionadas.size > 0) {
+          ejecutarCreacionPdf();
+        } else {
+          alert('Por favor, selecciona al menos una hoja de la cuadrícula de miniaturas para crear el nuevo PDF.');
+        }
+      }
+    });
+  }
+
+  function alternarHerramientaRecorte(forzarEstado) {
+    if (modoActual !== 'recortar') return;
+    
+    if (typeof forzarEstado === 'boolean') {
+      herramientaRecorteActiva = forzarEstado;
+    } else {
+      herramientaRecorteActiva = !herramientaRecorteActiva;
+    }
+    
+    if (capaRecorteInteractiva) {
+      capaRecorteInteractiva.classList.toggle('activa', herramientaRecorteActiva);
+    }
+    
+    if (herramientaRecorteActiva) {
+      // Posiciones de inicio por defecto
+      guiaSuperior = 10;
+      guiaInferior = 90;
+      guiaIzquierda = 10;
+      guiaDerecha = 90;
+      inicializarGuiasRecorte();
+    } else {
+      eliminarElementosRecorte();
+    }
+    actualizarMenuLateral();
+  }
 
   function mostrarCajaRecorteElemento() {
     const caja = document.querySelector('.caja-recorte-elemento');
@@ -411,18 +604,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     actualizarNombreSugerido();
-    actualizarBotonesControl();
-  }
-
-  function actualizarBotonesControl() {
-    if (modoActual === 'recortar') {
-      btnRecortar.innerHTML = `<iconify-icon icon="mdi:content-cut"></iconify-icon><span>Recortar Hoja</span>`;
-      btnRecortar.title = 'Recortar márgenes seleccionados de la hoja actual';
-    } else {
-      const totalSeleccionadas = paginasSeleccionadas.size;
-      btnRecortar.innerHTML = `<iconify-icon icon="mdi:file-multiple-outline"></iconify-icon><span>Crear PDF ${totalSeleccionadas > 0 ? `(${totalSeleccionadas})` : ''}</span>`;
-      btnRecortar.title = 'Crear un nuevo PDF con las páginas seleccionadas';
-    }
+    actualizarMenuLateral();
   }
 
   // ==========================================================================
@@ -568,12 +750,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  function desactivarHerramientaRecorte() {
-    herramientaRecorteActiva = false;
-    if (btnTrazarRecorte) btnTrazarRecorte.classList.remove('activo');
-    if (capaRecorteInteractiva) capaRecorteInteractiva.classList.remove('activa');
-    eliminarElementosRecorte();
-  }
+
 
   // ==========================================================================
   // CONTROLES DE NAVEGACIÓN INDIVIDUAL
@@ -592,21 +769,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  async function aplicarZoomIn() {
+    if (zoomActual < 3.0) {
+      zoomActual = parseFloat((zoomActual + 0.15).toFixed(2));
+      textoZoom.textContent = `${Math.round(zoomActual * 100)}%`;
+      await renderizarPagina(paginaActiva);
+    }
+  }
+
+  async function aplicarZoomOut() {
+    if (zoomActual > 0.4) {
+      zoomActual = parseFloat((zoomActual - 0.15).toFixed(2));
+      textoZoom.textContent = `${Math.round(zoomActual * 100)}%`;
+      await renderizarPagina(paginaActiva);
+    }
+  }
+
   btnZoomIn.addEventListener('click', async () => {
-    if (zoomActual < 2.5) {
-      zoomActual += 0.25;
+    if (zoomActual < 3.0) {
+      zoomActual = parseFloat((zoomActual + 0.25).toFixed(2));
       textoZoom.textContent = `${Math.round(zoomActual * 100)}%`;
       await renderizarPagina(paginaActiva);
     }
   });
 
   btnZoomOut.addEventListener('click', async () => {
-    if (zoomActual > 0.5) {
-      zoomActual -= 0.25;
+    if (zoomActual > 0.4) {
+      zoomActual = parseFloat((zoomActual - 0.25).toFixed(2));
       textoZoom.textContent = `${Math.round(zoomActual * 100)}%`;
       await renderizarPagina(paginaActiva);
     }
   });
+
+  // Vincular eventos de scroll con la tecla Control para el zoom interactivo
+  if (contenedorLienzoPdf) {
+    contenedorLienzoPdf.addEventListener('wheel', (e) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) {
+          aplicarZoomIn();
+        } else {
+          aplicarZoomOut();
+        }
+      }
+    }, { passive: false });
+  }
 
   btnRotar.addEventListener('click', async () => {
     rotacionActual = (rotacionActual + 90) % 360;
@@ -619,9 +826,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   function actualizarReglaEjemplo() {
     textoReglaEjemplo.innerHTML = `
       Regla de Renombrado activa:
-      <code>[TOMO]_[PAGINA_INICIAL]-[PAGINA_FINAL]_[ANIO]</code>
+      <code>Solo números (hasta 5 dígitos)</code>
       <br>Ejemplo sugerido:
-      <code>T01_001-010_2026.pdf</code>
+      <code>12345</code> o <code>00123</code>
     `;
   }
 
@@ -657,24 +864,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   function actualizarNombreSugerido() {
     if (!archivoSeleccionado) return;
     
-    let rangoHojas = '';
+    let numeroSugerido = paginaActiva;
     if (modoActual === 'crear' && paginasSeleccionadas.size > 0) {
       const paginasOrdenadas = Array.from(paginasSeleccionadas).sort((a, b) => a - b);
-      rangoHojas = agruparPaginas(paginasOrdenadas);
-    } else {
-      const paginaFormateada = String(paginaActiva).padStart(3, '0');
-      rangoHojas = `${paginaFormateada}-${paginaFormateada}`;
+      numeroSugerido = paginasOrdenadas[0];
     }
     
-    inputNuevoNombre.value = `${archivoSeleccionado.tomo}_${rangoHojas}_${archivoSeleccionado.anio}`;
+    // Sugerir la página actual formateada a 5 dígitos (solo números)
+    inputNuevoNombre.value = String(numeroSugerido).padStart(5, '0');
   }
 
   // ==========================================================================
   // EJECUCIÓN REAL DE PROCESAMIENTO POR IPC (Renombrar y Cortar)
   // ==========================================================================
   
-  // Renombrar PDF
-  btnRenombrar.addEventListener('click', async () => {
+  // ==========================================================================
+  // EJECUCIÓN REAL DE PROCESAMIENTO POR IPC (Renombrar, Recortar y Cortar)
+  // ==========================================================================
+  
+  // 1. Ejecutar Renombrado
+  async function ejecutarRenombrado() {
     if (!archivoSeleccionado) {
       alert('Selecciona un archivo PDF de la lista.');
       return;
@@ -686,15 +895,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // Validar regla de renombrado (solo dígitos, hasta 5 dígitos)
+    const esNombreValido = /^\d{1,5}$/.test(nuevoNombre);
+    if (!esNombreValido) {
+      alert('Error: El nombre debe contener únicamente números y tener un máximo de 5 dígitos (ej: 00123).');
+      return;
+    }
+
     if (window.apiProyecto && typeof window.apiProyecto.renombrarPDF === 'function') {
       try {
-        btnRenombrar.disabled = true;
+        if (btnMenuRenombrar) btnMenuRenombrar.disabled = true;
         const respuesta = await window.apiProyecto.renombrarPDF({
           rutaOriginal: archivoSeleccionado.rutaLocal,
           nuevoNombre: nuevoNombre
         });
         
-        btnRenombrar.disabled = false;
+        if (btnMenuRenombrar) btnMenuRenombrar.disabled = false;
         
         if (respuesta.exito) {
           alert('¡Archivo renombrado con éxito!');
@@ -703,120 +919,149 @@ document.addEventListener('DOMContentLoaded', async () => {
           archivoSeleccionado = null;
           pdfDocumento = null;
           paginasSeleccionadas.clear();
-          actualizarBotonesControl();
+          actualizarMenuLateral();
           
           await cargarListaPDFs();
         } else {
           alert(`Error al renombrar: ${respuesta.mensaje}`);
         }
       } catch (error) {
-        btnRenombrar.disabled = false;
+        if (btnMenuRenombrar) btnMenuRenombrar.disabled = false;
         console.error('Error al renombrar:', error);
         alert('Ocurrió un error inesperado al renombrar.');
       }
     }
-  });
+  }
 
-  // Botón Principal de Procesamiento (Corta geométricamente o extrae hojas según el modo)
-  btnRecortar.addEventListener('click', async () => {
+  // Vincular evento de renombrado
+  if (btnMenuRenombrar) {
+    btnMenuRenombrar.addEventListener('click', ejecutarRenombrado);
+  }
+
+  // 2. Ejecutar Recorte Geométrico
+  async function ejecutarRecorteGeometrico() {
     if (!archivoSeleccionado) {
       alert('Selecciona un archivo PDF de la lista.');
       return;
     }
 
-    const nuevoNombre = inputNuevoNombre.value.trim();
-    if (!nuevoNombre) {
-      alert('Por favor, ingresa el nombre final del archivo de salida.');
+    if (!herramientaRecorteActiva || !cajaRecorteElemento) {
+      alert('Activa la herramienta de recorte y ajusta las guías antes de recortar.');
       return;
     }
 
-    // MODO 1: RECORTAR MÁRGENES DE LA HOJA ACTUAL (Guardado físico real en disco)
-    if (modoActual === 'recortar') {
-      if (herramientaRecorteActiva && cajaRecorteElemento) {
-        const anchoProporcional = guiaDerecha - guiaIzquierda;
-        const altoProporcional = guiaInferior - guiaSuperior;
-        const xProporcional = guiaIzquierda;
-        const yProporcional = guiaSuperior;
+    const anchoProporcional = guiaDerecha - guiaIzquierda;
+    const altoProporcional = guiaInferior - guiaSuperior;
+    const xProporcional = guiaIzquierda;
+    const yProporcional = guiaSuperior;
 
-        const confirmar = confirm(`¿Estás seguro de que deseas recortar los márgenes de la página ${paginaActiva} y guardar el resultado directamente en el PDF original?\n\nEsta acción modificará físicamente el archivo.`);
-        if (!confirmar) return;
+    const confirmar = confirm(`¿Estás seguro de que deseas recortar los márgenes de la página ${paginaActiva} y guardar el resultado directamente en el PDF original?\n\nEsta acción modificará físicamente el archivo.`);
+    if (!confirmar) return;
 
-        if (window.apiProyecto && typeof window.apiProyecto.recortarMargenesPDF === 'function') {
-          try {
-            btnRecortar.disabled = true;
-            btnRecortar.textContent = 'Recortando...';
-
-            const respuesta = await window.apiProyecto.recortarMargenesPDF({
-              rutaOriginal: archivoSeleccionado.rutaLocal,
-              numPagina: paginaActiva,
-              x: xProporcional,
-              y: yProporcional,
-              ancho: anchoProporcional,
-              alto: altoProporcional
-            });
-
-            btnRecortar.disabled = false;
-            actualizarBotonesControl();
-
-            if (respuesta.exito) {
-              alert('¡Página recortada correctamente y guardada en el PDF original!');
-              
-              // Desactivar herramienta de recorte y limpiar guías
-              desactivarHerramientaRecorte();
-
-              // Recargar PDF con cache-buster para forzar a PDF.js a leer el archivo modificado
-              const urlSegura = window.apiProyecto.obtenerRutaArchivo(archivoSeleccionado.rutaLocal);
-              const urlConCacheBuster = `${urlSegura}?t=${Date.now()}`;
-              
-              await cargarYRenderizarPDF(urlConCacheBuster);
-              await cargarListaPDFs();
-            } else {
-              alert(`Error al recortar los márgenes: ${respuesta.mensaje}`);
-            }
-          } catch (error) {
-            btnRecortar.disabled = false;
-            actualizarBotonesControl();
-            console.error('Error al recortar márgenes:', error);
-            alert('Ocurrió un error inesperado al recortar.');
-          }
+    if (window.apiProyecto && typeof window.apiProyecto.recortarMargenesPDF === 'function') {
+      try {
+        if (btnMenuRecortar) {
+          btnMenuRecortar.disabled = true;
+          btnMenuRecortar.querySelector('span').textContent = 'Recortando...';
         }
-      } else {
-        alert('Activa la herramienta de recorte en el visor y ajusta las líneas guías para recortar.');
+
+        const respuesta = await window.apiProyecto.recortarMargenesPDF({
+          rutaOriginal: archivoSeleccionado.rutaLocal,
+          numPagina: paginaActiva,
+          x: xProporcional,
+          y: yProporcional,
+          ancho: anchoProporcional,
+          alto: altoProporcional
+        });
+
+        if (btnMenuRecortar) btnMenuRecortar.disabled = false;
+        actualizarMenuLateral();
+
+        if (respuesta.exito) {
+          alert('¡Página recortada correctamente y guardada en el PDF original!');
+          
+          // Desactivar herramienta de recorte y limpiar guías
+          desactivarHerramientaRecorte();
+
+          // Recargar PDF con cache-buster para forzar a PDF.js a leer el archivo modificado
+          const urlSegura = window.apiProyecto.obtenerRutaArchivo(archivoSeleccionado.rutaLocal);
+          const urlConCacheBuster = `${urlSegura}?t=${Date.now()}`;
+          
+          await cargarYRenderizarPDF(urlConCacheBuster);
+          await cargarListaPDFs();
+        } else {
+          alert(`Error al recortar los márgenes: ${respuesta.mensaje}`);
+        }
+      } catch (error) {
+        if (btnMenuRecortar) btnMenuRecortar.disabled = false;
+        actualizarMenuLateral();
+        console.error('Error al recortar márgenes:', error);
+        alert('Ocurrió un error inesperado al recortar.');
       }
+    }
+  }
+
+  // 3. Ejecutar Creación de PDF desde Miniaturas
+  async function ejecutarCreacionPdf() {
+    if (!archivoSeleccionado) {
+      alert('Selecciona un archivo PDF de la lista.');
       return;
     }
 
-    // MODO 2: CREACIÓN/EXTRACCIÓN DE PDF REAL A PARTIR DE PÁGINAS SELECCIONADAS
-    // Si no seleccionaron ninguna miniatura en el mosaico, preguntamos si quieren extraer solo la página que estaban viendo
+    // Obtener sugerencia actual
+    let sugerenciaActual = inputNuevoNombre.value.trim();
+    if (!/^\d{1,5}$/.test(sugerenciaActual)) {
+      const paginasOrdenadas = Array.from(paginasSeleccionadas).sort((a, b) => a - b);
+      const pagRef = paginasOrdenadas.length > 0 ? paginasOrdenadas[0] : paginaActiva;
+      sugerenciaActual = String(pagRef).padStart(5, '0');
+    }
+
+    // Pedir renombrar expresamente para el nuevo PDF
+    const nuevoNombre = prompt(
+      'Ingresa el nombre del nuevo PDF (únicamente números, máximo 5 dígitos):',
+      sugerenciaActual
+    );
+
+    // Cancelar creación si presiona Cancelar
+    if (nuevoNombre === null) {
+      return;
+    }
+
+    const nombreLimpio = nuevoNombre.trim();
+    if (!/^\d{1,5}$/.test(nombreLimpio)) {
+      alert('Error: El nombre ingresado debe contener únicamente números y tener un máximo de 5 dígitos (ej: 00123).');
+      return;
+    }
+
+    // Guardar el nombre validado en el input
+    inputNuevoNombre.value = nombreLimpio;
+
     const paginasACortar = paginasSeleccionadas.size > 0
       ? Array.from(paginasSeleccionadas).sort((a, b) => a - b)
       : [paginaActiva];
 
-    if (paginasSeleccionadas.size === 0) {
-      const confirmar = confirm(`No has seleccionado ninguna página en la rejilla de miniaturas.\n¿Deseas crear el PDF usando únicamente la página activa actual (Pág. ${paginaActiva})?`);
-      if (!confirmar) return;
-    }
-
     if (window.apiProyecto && typeof window.apiProyecto.cortarPaginasPDF === 'function') {
       try {
-        btnRecortar.disabled = true;
-        btnRecortar.textContent = 'Procesando...';
+        if (btnMenuCortar) {
+          btnMenuCortar.disabled = true;
+          btnMenuCortar.querySelector('span').textContent = 'Procesando...';
+        }
 
         const respuesta = await window.apiProyecto.cortarPaginasPDF({
           rutaOriginal: archivoSeleccionado.rutaLocal,
           paginas: paginasACortar,
-          nombreSalida: nuevoNombre
+          nombreSalida: nombreLimpio
         });
 
-        btnRecortar.disabled = false;
-        actualizarBotonesControl();
+        if (btnMenuCortar) btnMenuCortar.disabled = false;
+        actualizarMenuLateral();
 
         if (respuesta.exito) {
-          alert('¡Nuevo archivo PDF creado de forma física en disco con las páginas seleccionadas!');
+          alert('¡Nuevo archivo PDF creado con éxito con las páginas seleccionadas!');
           
           // Limpiar selecciones
           paginasSeleccionadas.clear();
-          actualizarBotonesControl();
+          actualizarMenuLateral();
 
           // Refrescar cuadrícula
           document.querySelectorAll('.tarjeta-miniatura').forEach(t => t.classList.remove('seleccionada'));
@@ -824,14 +1069,17 @@ document.addEventListener('DOMContentLoaded', async () => {
           // Recargar cola de archivos
           await cargarListaPDFs();
         } else {
-          alert(`Error al recortar el PDF: ${respuesta.mensaje}`);
+          alert(`Error al crear el PDF: ${respuesta.mensaje}`);
         }
       } catch (error) {
-        btnRecortar.disabled = false;
-        actualizarBotonesControl();
+        if (btnMenuCortar) btnMenuCortar.disabled = false;
+        actualizarMenuLateral();
         console.error('Error al cortar:', error);
-        alert('Ocurrió un error inesperado al recortar.');
+        alert('Ocurrió un error inesperado al crear el PDF.');
       }
     }
-  });
+  }
+
+  // Inicializar estado del menú lateral
+  actualizarMenuLateral();
 });

@@ -15,7 +15,7 @@
   <!-- Cargar CDN de Mozilla PDF.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
-<body>
+<body class="en-login">
   <div id="contenedor-aplicacion">
     <!-- Encabezado de la Aplicación -->
     <header class="encabezado-app">
@@ -71,21 +71,55 @@
     <!-- PANTALLA 2: Panel de Captura Principal (Oculto Inicialmente) -->
     <main class="pantalla seccion-captura oculto" id="seccion-captura">
       
-      <!-- Panel Lateral Izquierdo: Lista de Archivos -->
+      <!-- Panel Lateral Izquierdo: Controles y Acciones -->
       <aside class="panel-lateral-lista">
-        <div class="panel-titulo">Cola de PDFs</div>
-        <div class="lista-archivos" id="lista-archivos-contenedor">
-          <!-- Se llena dinámicamente desde js/cliente.js -->
+        <div class="panel-titulo">Captura y Renombrado</div>
+
+        <!-- Panel de Controles de Captura Integrado -->
+        <div class="panel-controles-captura">
+          <!-- Caja de la regla del lote (siempre visible) -->
+          <div class="caja-regla-desplegable" id="caja-regla-desplegable">
+            <h4>Regla del Lote:</h4>
+            <p id="texto-regla-ejemplo">Cargando regla...</p>
+          </div>
+
+          <div class="grupo-formulario-lateral">
+            <div class="cabecera-label-lateral">
+              <label for="input-nuevo-nombre">Nombre sugerido</label>
+            </div>
+            <input type="text" id="input-nuevo-nombre" placeholder="Nombre sugerido" autocomplete="off">
+          </div>
+
+          <div class="botones-menu-acciones">
+            <button class="btn-menu-accion" id="btn-menu-renombrar" title="Renombrar el PDF de forma física en red">
+              <iconify-icon icon="mdi:rename-box"></iconify-icon>
+              <span>Renombrar PDF</span>
+            </button>
+            <button class="btn-menu-accion" id="btn-menu-recortar" title="Activar/Aplicar recorte geométrico de página">
+              <iconify-icon icon="mdi:content-cut"></iconify-icon>
+              <span>Recortar Página</span>
+            </button>
+            <button class="btn-menu-accion" id="btn-menu-cortar" title="Entrar a vista de miniaturas y guardar selección">
+              <iconify-icon icon="mdi:file-multiple-outline"></iconify-icon>
+              <span>Cortar PDF</span>
+            </button>
+          </div>
         </div>
       </aside>
 
       <!-- Panel Central: Previsualizador del PDF con PDF.js (Canvas) -->
       <section class="panel-central-visor" id="panel-central-visor">
+        <!-- Cargador del Visor de PDF (Spinner) -->
+        <div class="cargador-visor oculto" id="cargador-visor">
+          <div class="circulo-carga"></div>
+          <p id="cargador-visor-texto">Cargando documento...</p>
+        </div>
+
         <!-- Placeholder cuando no hay archivo cargado -->
         <div class="placeholder-visor" id="visor-placeholder">
           <iconify-icon icon="mdi:file-pdf-box" class="icono-grande-pdf"></iconify-icon>
-          <h3>Ningún PDF seleccionado</h3>
-          <p>Selecciona un archivo de la lista de la izquierda para comenzar a trabajar en el visor.</p>
+          <h3>Buscando PDFs en la red...</h3>
+          <p>La aplicación cargará automáticamente los libros localizados en las carpetas de lote.</p>
         </div>
 
         <!-- Visor de PDF Activo con PDF.js (Canvas) -->
@@ -93,18 +127,6 @@
           <div class="visor-cabecera">
             <div class="visor-titulo-grupo">
               <span id="visor-titulo-doc">nombre_archivo.pdf</span>
-              
-              <!-- Pestañas para alternar modos de trabajo -->
-              <div class="visor-pestanas">
-                <button class="btn-pestana activa" id="pestana-pagina" title="Recortar márgenes de la hoja actual">
-                  <iconify-icon icon="mdi:content-cut"></iconify-icon>
-                  <span>Recortar PDF</span>
-                </button>
-                <button class="btn-pestana" id="pestana-miniaturas" title="Seleccionar hojas y crear un nuevo PDF">
-                  <iconify-icon icon="mdi:file-multiple-outline"></iconify-icon>
-                  <span>Crear PDF</span>
-                </button>
-              </div>
             </div>
             
             <!-- Barra de Controles de PDF.js -->
@@ -132,12 +154,6 @@
               <button class="btn-visor" id="btn-rotar" title="Rotar Vista 90°">
                 <iconify-icon icon="mdi:rotate-right"></iconify-icon>
               </button>
-              
-              <span class="divisor-controles"></span>
-              
-              <button class="btn-visor" id="btn-trazar-recorte" title="Activar herramienta de trazado de recorte">
-                <iconify-icon icon="mdi:crop"></iconify-icon>
-              </button>
             </div>
           </div>
           
@@ -161,40 +177,6 @@
           </div>
         </div>
       </section>
-
-      <!-- Panel Lateral Derecho: Lógica de Captura y Reglas -->
-      <aside class="panel-lateral-captura">
-        <div class="panel-titulo">Control de Captura</div>
-        
-        <div class="panel-cuerpo">
-          <!-- Caja de la Regla de Ejemplo -->
-          <div class="caja-regla">
-            <h4>
-              <iconify-icon icon="mdi:information-outline" style="color: #38bdf8;"></iconify-icon>
-              Regla del Lote
-            </h4>
-            <p id="texto-regla-ejemplo">Cargando regla de ejemplo...</p>
-          </div>
-
-          <!-- Campos de Edición -->
-          <div class="panel-controles">
-            <div class="grupo-formulario">
-              <label for="input-nuevo-nombre">Nombre sugerido (Editar)</label>
-              <input type="text" id="input-nuevo-nombre" placeholder="Nombre final del archivo" autocomplete="off">
-            </div>
-
-            <button class="btn-accion" id="btn-renombrar">
-              <iconify-icon icon="mdi:rename-box"></iconify-icon>
-              <span>Renombrar PDF</span>
-            </button>
-            
-            <button class="btn-accion btn-secundario" id="btn-recortar">
-              <iconify-icon icon="mdi:content-cut"></iconify-icon>
-              <span>Recortar Página</span>
-            </button>
-          </div>
-        </div>
-      </aside>
 
     </main>
 
