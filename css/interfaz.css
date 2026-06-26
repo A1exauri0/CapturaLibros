@@ -1,35 +1,5 @@
-/* Variables del Sistema de Diseño - Tema Oscuro (Por defecto) */
+/* Variables del Sistema de Diseño - Tema Claro (Por defecto al iniciar) */
 :root {
-  --color-fondo: #0a0e17;
-  --color-superficie: rgba(17, 24, 39, 0.75);
-  --color-superficie-panel: rgba(15, 23, 42, 0.95);
-  --color-superficie-resaltada: rgba(30, 41, 59, 0.5);
-  --color-borde: rgba(255, 255, 255, 0.08);
-  --color-borde-activo: #38bdf8;
-  
-  /* Paleta de Texto */
-  --color-texto-principal: #f3f4f6;
-  --color-texto-secundario: #9ca3af;
-  --color-texto-deshabilitado: #4b5563;
-  
-  /* Gradientes y Colores de Estado */
-  --gradiente-primario: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
-  --gradiente-brillo: linear-gradient(135deg, #38bdf8 0%, #3b82f6 100%);
-  --gradiente-regla: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%);
-  --color-exito: #10b981;
-  --color-error: #ef4444;
-  --color-alerta: #f59e0b;
-  
-  /* Ajustes Visuales */
-  --fuente-principal: 'Outfit', sans-serif;
-  --radio-borde-principal: 16px;
-  --radio-borde-control: 10px;
-  --sombra-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-  --transicion-suave: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Redefinición para el Tema Claro */
-.tema-claro {
   --color-fondo: #f1f5f9;
   --color-superficie: rgba(255, 255, 255, 0.7);
   --color-superficie-panel: #ffffff;
@@ -43,8 +13,38 @@
   --color-texto-deshabilitado: #94a3b8;
   
   /* Gradientes y Colores de Estado */
+  --gradiente-primario: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+  --gradiente-brillo: linear-gradient(135deg, #38bdf8 0%, #3b82f6 100%);
   --gradiente-regla: linear-gradient(135deg, rgba(14, 165, 233, 0.06) 0%, rgba(37, 99, 235, 0.03) 100%);
+  --color-exito: #10b981;
+  --color-error: #ef4444;
+  --color-alerta: #f59e0b;
+  
+  /* Ajustes Visuales */
+  --fuente-principal: 'Outfit', sans-serif;
+  --radio-borde-principal: 16px;
+  --radio-borde-control: 10px;
   --sombra-glass: 0 8px 32px 0 rgba(148, 163, 184, 0.12);
+  --transicion-suave: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Redefinición para el Tema Oscuro (Manual) */
+.tema-oscuro {
+  --color-fondo: #0a0e17;
+  --color-superficie: rgba(17, 24, 39, 0.75);
+  --color-superficie-panel: rgba(15, 23, 42, 0.95);
+  --color-superficie-resaltada: rgba(30, 41, 59, 0.5);
+  --color-borde: rgba(255, 255, 255, 0.08);
+  --color-borde-activo: #38bdf8;
+  
+  /* Paleta de Texto */
+  --color-texto-principal: #f3f4f6;
+  --color-texto-secundario: #9ca3af;
+  --color-texto-deshabilitado: #4b5563;
+  
+  /* Gradientes y Colores de Estado */
+  --gradiente-regla: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%);
+  --sombra-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
 }
 
 /* Reseteo y Estilos Generales */
@@ -515,11 +515,100 @@ body {
   color: var(--color-texto-principal);
 }
 
-.visor-pdf-real {
+.contenedor-lienzo-pdf {
   flex-grow: 1;
   width: 100%;
-  height: calc(100% - 38px);
-  background: #1e293b;
+  height: calc(100% - 42px);
+  background: #cbd5e1; /* Claro por defecto */
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 30px;
+  transition: background var(--transicion-suave);
+}
+
+.tema-oscuro .contenedor-lienzo-pdf {
+  background: #101520; /* Oscuro */
+}
+
+#canvas-pdf {
+  background-color: white;
+  box-shadow: 0 8px 24px rgba(148, 163, 184, 0.3); /* Claro por defecto */
+  border-radius: 4px;
+  transition: transform 0.2s ease-in-out;
+}
+
+.tema-oscuro #canvas-pdf {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); /* Oscuro */
+}
+
+.visor-controles {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-visor {
+  background: transparent;
+  border: none;
+  color: var(--color-texto-principal);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: var(--transicion-suave);
+}
+
+.btn-visor.activo {
+  background: rgba(14, 165, 233, 0.15) !important;
+  color: var(--color-borde-activo) !important;
+  border: 1px solid rgba(14, 165, 233, 0.3) !important;
+}
+
+.btn-visor:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-borde-activo);
+}
+
+.tema-claro .btn-visor:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.btn-visor:disabled {
+  color: var(--color-texto-deshabilitado);
+  cursor: not-allowed;
+}
+
+.btn-visor iconify-icon {
+  font-size: 18px;
+}
+
+.visor-paginacion {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-texto-principal);
+  min-width: 90px;
+  text-align: center;
+}
+
+.divisor-controles {
+  width: 1px;
+  height: 16px;
+  background-color: var(--color-borde);
+  margin: 0 4px;
+  display: inline-block;
+}
+
+.texto-zoom {
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 42px;
+  text-align: center;
+  color: var(--color-texto-principal);
 }
 
 /* Panel Lateral Derecho: Captura y Edición */
@@ -637,3 +726,273 @@ body {
   0%, 100% { transform: scale(1); opacity: 0.7; }
   50% { transform: scale(1.05); opacity: 1; }
 }
+
+/* ==========================================================================
+   ESTILOS DE PESTAÑAS DE VISUALIZACIÓN Y REJILLA DE MINIATURAS
+   ========================================================================== */
+.visor-titulo-grupo {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.visor-pestanas {
+  display: flex;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--color-borde);
+}
+
+.tema-oscuro .visor-pestanas {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-pestana {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-texto-secundario);
+  font-family: var(--fuente-principal);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: var(--transicion-suave);
+}
+
+.btn-pestana iconify-icon {
+  font-size: 14px;
+}
+
+.btn-pestana:hover {
+  color: var(--color-texto-principal);
+}
+
+.btn-pestana.activa {
+  background: var(--color-superficie-panel);
+  color: var(--color-borde-activo);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.contenedor-rejilla-miniaturas {
+  flex-grow: 1;
+  width: 100%;
+  height: calc(100% - 42px);
+  padding: 20px;
+  overflow-y: auto;
+  background: var(--color-fondo);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: background var(--transicion-suave);
+}
+
+.visor-instruccion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(14, 165, 233, 0.05);
+  border: 1px solid rgba(14, 165, 233, 0.15);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--color-texto-secundario);
+}
+
+.rejilla-miniaturas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 16px;
+  padding-bottom: 20px;
+}
+
+.tarjeta-miniatura {
+  background: var(--color-superficie-panel);
+  border: 1px solid var(--color-borde);
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  transition: var(--transicion-suave);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+}
+
+.tarjeta-miniatura:hover {
+  transform: translateY(-2px);
+  border-color: rgba(14, 165, 233, 0.4);
+  box-shadow: 0 6px 15px rgba(14, 165, 233, 0.08);
+}
+
+.tarjeta-miniatura.seleccionada {
+  border-color: var(--color-borde-activo);
+  background: rgba(14, 165, 233, 0.04);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+}
+
+.tarjeta-miniatura canvas {
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  background: white;
+}
+
+.tarjeta-miniatura .num-pag-miniatura {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-texto-secundario);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.tema-oscuro .tarjeta-miniatura .num-pag-miniatura {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tarjeta-miniatura.seleccionada .num-pag-miniatura {
+  background: var(--color-borde-activo);
+  color: white;
+}
+
+.tarjeta-miniatura .checkbox-seleccion {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-superficie-panel);
+  border: 1.5px solid var(--color-borde);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: transparent;
+  font-size: 11px;
+  transition: var(--transicion-suave);
+  z-index: 2;
+}
+
+.tarjeta-miniatura.seleccionada .checkbox-seleccion {
+  background: var(--color-borde-activo);
+  border-color: var(--color-borde-activo);
+  color: white;
+}
+
+/* ==========================================================================
+   ESTILOS DE CAJA DE RECORTE GEOMÉTRICO INTERACTIVO
+   ========================================================================= */
+.lienzo-envoltura {
+  position: relative;
+  display: inline-block;
+  margin: auto;
+  overflow: hidden; /* Mantiene la sombra de la máscara de recorte dentro del lienzo */
+  border-radius: 4px;
+}
+
+.capa-recorte-interactiva {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none; /* Inactivo por defecto */
+}
+
+.capa-recorte-interactiva.activa {
+  pointer-events: auto;
+  cursor: default; /* El cursor dependera de la guia que se apunte */
+}
+
+.caja-recorte-elemento {
+  position: absolute;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  background: rgba(14, 165, 233, 0.02);
+  /* Sombra gigante que oscurece el resto de la página que no está seleccionada */
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.55);
+  pointer-events: none;
+  z-index: 6;
+  transition: opacity 0.15s ease-in-out;
+}
+
+.tema-claro .caja-recorte-elemento {
+  box-shadow: 0 0 0 9999px rgba(71, 85, 105, 0.45);
+}
+
+/* Estilos para las guías de recorte lineales y arrastrables */
+.linea-recorte {
+  position: absolute;
+  z-index: 7;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.linea-recorte-horizontal {
+  left: 0;
+  width: 100%;
+  height: 10px; /* Mayor zona táctil */
+  margin-top: -5px; /* Centrado en la coordenada Y exacta */
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+}
+
+.linea-recorte-horizontal::after {
+  content: '';
+  width: 100%;
+  height: 2px;
+  background-color: #0ea5e9;
+  border-top: 1px dashed rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+  transition: var(--transicion-suave);
+}
+
+.linea-recorte-vertical {
+  top: 0;
+  height: 100%;
+  width: 10px; /* Mayor zona táctil */
+  margin-left: -5px; /* Centrado en la coordenada X exacta */
+  cursor: ew-resize;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.linea-recorte-vertical::after {
+  content: '';
+  height: 100%;
+  width: 2px;
+  background-color: #0ea5e9;
+  border-left: 1px dashed rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+  transition: var(--transicion-suave);
+}
+
+/* Efectos al hacer hover o arrastrar */
+.linea-recorte:hover::after,
+.linea-recorte.arrastrando::after {
+  background-color: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+.linea-recorte-horizontal:hover::after,
+.linea-recorte-horizontal.arrastrando::after {
+  height: 3px;
+}
+
+.linea-recorte-vertical:hover::after,
+.linea-recorte-vertical.arrastrando::after {
+  width: 3px;
+}
+

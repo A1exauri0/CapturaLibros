@@ -8,8 +8,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/interfaz.css">
+  
   <!-- Cargar CDN de Iconify para iconos modernos -->
   <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+  
+  <!-- Cargar CDN de Mozilla PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
   <div id="contenedor-aplicacion">
@@ -19,21 +23,23 @@
         <span class="icono">
           <iconify-icon icon="mdi:book-open-page-variant" style="color: #38bdf8;"></iconify-icon>
         </span>
-        <h1>CapturaLibros</h1>
+        <h1>Captura de Libros</h1>
       </div>
       <div class="controles-cabecera">
         <!-- Interruptor de Tema (Modo Claro / Modo Oscuro) -->
         <button class="btn-tema" id="btn-tema" title="Alternar tema de colores">
           <iconify-icon icon="mdi:weather-night" id="icono-tema"></iconify-icon>
         </button>
+        <!--
         <div class="estado-sistema" id="estado-conexion">
           <span class="punto-conexion inactivo"></span>
           <span id="texto-conexion">Desconectado</span>
         </div>
+        -->
       </div>
     </header>
 
-    <!-- PANTALLA 1: Formulario de Login Simulado -->
+    <!-- PANTALLA 1: Formulario de Login Simulado (Oculto dinámicamente si se omite) -->
     <main class="pantalla seccion-login" id="seccion-login">
       <div class="tarjeta-login">
         <div class="login-cabecera">
@@ -73,7 +79,7 @@
         </div>
       </aside>
 
-      <!-- Panel Central: Previsualizador del PDF Real -->
+      <!-- Panel Central: Previsualizador del PDF con PDF.js (Canvas) -->
       <section class="panel-central-visor" id="panel-central-visor">
         <!-- Placeholder cuando no hay archivo cargado -->
         <div class="placeholder-visor" id="visor-placeholder">
@@ -82,14 +88,76 @@
           <p>Selecciona un archivo de la lista de la izquierda para comenzar a trabajar en el visor.</p>
         </div>
 
-        <!-- Visor de PDF Real mediante iframe -->
+        <!-- Visor de PDF Activo con PDF.js (Canvas) -->
         <div class="visor-activo oculto" id="visor-activo">
           <div class="visor-cabecera">
-            <span id="visor-titulo-doc">nombre_archivo.pdf</span>
-            <span>Visor Documento</span>
+            <div class="visor-titulo-grupo">
+              <span id="visor-titulo-doc">nombre_archivo.pdf</span>
+              
+              <!-- Pestañas para alternar modos de trabajo -->
+              <div class="visor-pestanas">
+                <button class="btn-pestana activa" id="pestana-pagina" title="Recortar márgenes de la hoja actual">
+                  <iconify-icon icon="mdi:content-cut"></iconify-icon>
+                  <span>Recortar PDF</span>
+                </button>
+                <button class="btn-pestana" id="pestana-miniaturas" title="Seleccionar hojas y crear un nuevo PDF">
+                  <iconify-icon icon="mdi:file-multiple-outline"></iconify-icon>
+                  <span>Crear PDF</span>
+                </button>
+              </div>
+            </div>
+            
+            <!-- Barra de Controles de PDF.js -->
+            <div class="visor-controles" id="visor-controles-barra">
+              <button class="btn-visor" id="btn-ant" title="Página Anterior">
+                <iconify-icon icon="mdi:chevron-left"></iconify-icon>
+              </button>
+              <span class="visor-paginacion">Pág. <span id="pag-actual">0</span> de <span id="pag-total">0</span></span>
+              <button class="btn-visor" id="btn-sig" title="Página Siguiente">
+                <iconify-icon icon="mdi:chevron-right"></iconify-icon>
+              </button>
+              
+              <span class="divisor-controles"></span>
+              
+              <button class="btn-visor" id="btn-zoom-out" title="Reducir Zoom">
+                <iconify-icon icon="mdi:minus"></iconify-icon>
+              </button>
+              <span id="texto-zoom" class="texto-zoom">100%</span>
+              <button class="btn-visor" id="btn-zoom-in" title="Aumentar Zoom">
+                <iconify-icon icon="mdi:plus"></iconify-icon>
+              </button>
+              
+              <span class="divisor-controles"></span>
+              
+              <button class="btn-visor" id="btn-rotar" title="Rotar Vista 90°">
+                <iconify-icon icon="mdi:rotate-right"></iconify-icon>
+              </button>
+              
+              <span class="divisor-controles"></span>
+              
+              <button class="btn-visor" id="btn-trazar-recorte" title="Activar herramienta de trazado de recorte">
+                <iconify-icon icon="mdi:crop"></iconify-icon>
+              </button>
+            </div>
           </div>
-          <div class="visor-pdf-real">
-            <iframe id="iframe-visor-pdf" src="" width="100%" height="100%" style="border:none;"></iframe>
+          
+          <!-- Contenedor del Lienzo PDF (Página Individual con Capa de Recorte) -->
+          <div class="contenedor-lienzo-pdf" id="contenedor-lienzo-pdf">
+            <div class="lienzo-envoltura" id="lienzo-envoltura" style="position: relative; display: inline-block;">
+              <canvas id="canvas-pdf"></canvas>
+              <div class="capa-recorte-interactiva" id="capa-recorte-interactiva" title="Mantén presionado y arrastra para dibujar el área de corte"></div>
+            </div>
+          </div>
+
+          <!-- Contenedor de la Rejilla de Miniaturas (Creación de PDF) -->
+          <div class="contenedor-rejilla-miniaturas oculto" id="contenedor-rejilla-miniaturas">
+            <div class="visor-instruccion">
+              <iconify-icon icon="mdi:gesture-tap" style="color: #0ea5e9; font-size: 16px;"></iconify-icon>
+              <span>Haz clic en las miniaturas para seleccionar o deseleccionar páginas. El nuevo PDF solo tendrá las hojas que marques.</span>
+            </div>
+            <div class="rejilla-miniaturas" id="rejilla-miniaturas-pdf">
+              <!-- Renderizado dinámico de tarjetas de páginas -->
+            </div>
           </div>
         </div>
       </section>
@@ -132,7 +200,7 @@
 
     <!-- Pie de Página -->
     <footer class="pie-app">
-      <p>&copy; 2026 CapturaLibros - Estructura Vanilla y Procesamiento Local</p>
+      <p>&copy; 2026 Captura de Libros - Estructura Vanilla y Procesamiento Local</p>
     </footer>
   </div>
 
