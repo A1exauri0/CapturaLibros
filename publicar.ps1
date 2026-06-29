@@ -32,19 +32,19 @@ if (-not (Test-Path $rutaRed)) {
 }
 
 # Definir origen de datos para la copia
-# Si se ha empaquetado previamente (ej: dist/win-unpacked), se publica esa carpeta.
-# Si no, se publica el código fuente de desarrollo.
-$rutaOrigen = "."
-$exclusionesDirectorio = @(".git", ".vscode", "node_modules", "dist", "pdfs")
-
-if (Test-Path "dist\win-unpacked") {
-    $rutaOrigen = "dist\win-unpacked"
-    Write-Host "Detectada compilación empaquetada en dist\win-unpacked. Publicando desde ahí..." -ForegroundColor Green
-    $exclusionesDirectorio = @()
+# Exigir que la aplicación esté empaquetada en dist/win-unpacked
+if (-not (Test-Path "dist\win-unpacked")) {
+    Write-Host "[ERROR] No se encontró la carpeta compilada 'dist\win-unpacked'." -ForegroundColor Red
+    Write-Host "Por favor, compila la aplicación ejecutando primero el comando: pnpm run build" -ForegroundColor Yellow
+    Write-Host "Publicación cancelada." -ForegroundColor Red
+    exit 1
 }
 
+$rutaOrigen = "dist\win-unpacked"
+$exclusionesDirectorio = @()
+
 # Configurar argumentos de robocopy
-$argumentosRobocopy = @($rutaOrigen, $rutaRed, "/E", "/R:2", "/W:2")
+$argumentosRobocopy = @($rutaOrigen, $rutaRed, "/E", "/PURGE", "/R:2", "/W:2")
 
 if ($exclusionesDirectorio.Count -gt 0) {
     $argumentosRobocopy += "/XD"
