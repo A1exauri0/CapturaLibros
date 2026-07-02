@@ -1,7 +1,7 @@
 const os = require("os");
+const { URL_BASE } = require("../config/config");
 
-// URL local de desarrollo en Laragon para stellum2.0
-const URL_API_AUDITORIA = "http://127.0.0.1:8000/api/registro-libros";
+const URL_API_AUDITORIA = `${URL_BASE}/api/registro-libros`;
 
 /**
  * Envía un registro de auditoría al servidor central de Stellum.

@@ -1,14 +1,25 @@
-const { app, BrowserWindow, ipcMain, protocol, net } = require('electron');
-const path = require('path');
-const fs = require('fs');
-const { pathToFileURL } = require('url');
+const { app, BrowserWindow, ipcMain, protocol, net } = require("electron");
+const path = require("path");
+const fs = require("fs");
+const { pathToFileURL } = require("url");
 
 // Servicios modulares del sistema
-const { validarUsuario } = require('./servicios/autenticacion');
-const { obtenerPdfsDeRed, renombrarArchivoPdf } = require('./servicios/gestorArchivos');
-const { cortarPaginasPdf, recortarMargenesPagina } = require('./servicios/procesamientoPdf');
-const { reportarAuditoria } = require('./servicios/auditoria');
-const { verificarYActualizar } = require('./servicios/actualizador');
+const { validarUsuario } = require("./servicios/auth");
+const {
+  obtenerPdfsDeRed,
+  renombrarArchivoPdf,
+} = require("./servicios/gestorArchivos");
+const {
+  cortarPaginasPdf,
+  recortarMargenesPagina,
+} = require("./servicios/procesamientoPdf");
+const { reportarAuditoria } = require("./servicios/auditoria");
+const { verificarYActualizar } = require("./servicios/updater");
+
+// Cargar variables de entorno desde el archivo .env
+require("dotenv").config();
+
+const BASE_URL = process.env.URL_BASE;
 
 let usuarioActivo = null;
 
@@ -17,7 +28,7 @@ let ventanaPrincipal;
 // Registrar un esquema seguro personalizado para archivos locales
 protocol.registerSchemesAsPrivileged([
   {
-    scheme: 'app-archivo',
+    scheme: "app-archivo",
     privileges: { bypassCSP: true, secure: true, supportFetchAPI: true },
   },
 ]);
@@ -31,18 +42,18 @@ function crearVentana() {
     minHeight: 768,
     resizable: true,
     maximizable: true,
-    icon: path.join(__dirname, 'assets/libros.png'),
+    icon: path.join(__dirname, "assets/libros.png"),
     webPreferences: {
-      preload: path.join(__dirname, 'precarga.js'),
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
     },
-    title: 'Captura y Validación de Libros',
-    autoHideMenuBar: true
+    title: "Captura y Validación de Libros",
+    autoHideMenuBar: true,
   });
 
   // Cargar directamente el index.html local
-  ventanaPrincipal.loadFile(path.join(__dirname, 'index.html'));
+  ventanaPrincipal.loadFile(path.join(__dirname, "index.html"));
 
   // Maximizar la ventana desde el inicio
   ventanaPrincipal.maximize();
@@ -54,24 +65,26 @@ function crearVentana() {
 // Iniciar la aplicación cuando Electron esté listo
 app.whenReady().then(() => {
   // Manejador para el protocolo app-archivo
-  protocol.handle('app-archivo', (solicitud) => {
+  protocol.handle("app-archivo", (solicitud) => {
     try {
       // Decodificar la URL del archivo local removiendo el protocolo con tres barras
-      const urlLimpia = solicitud.url.replace('app-archivo:///', '');
-      
+      const urlLimpia = solicitud.url.replace("app-archivo:///", "");
+
       // Quitar los parámetros de consulta (query params como ?t=...) si existen
-      const urlSinQuery = urlLimpia.split('?')[0];
-      
+      const urlSinQuery = urlLimpia.split("?")[0];
+
       const rutaArchivo = decodeURIComponent(urlSinQuery);
-      
+
       // Convertir la ruta del sistema a un formato file:/// de URL de forma robusta
-      const urlArchivoLocal = pathToFileURL(path.resolve(rutaArchivo)).toString();
-      
+      const urlArchivoLocal = pathToFileURL(
+        path.resolve(rutaArchivo),
+      ).toString();
+
       // Devolver el archivo del sistema
       return net.fetch(urlArchivoLocal);
     } catch (error) {
-      console.error('Error al cargar archivo en el protocolo seguro:', error);
-      return new Response('Error al cargar el archivo', { status: 500 });
+      console.error("Error al cargar archivo en el protocolo seguro:", error);
+      return new Response("Error al cargar el archivo", { status: 500 });
     }
   });
 
@@ -79,12 +92,12 @@ app.whenReady().then(() => {
 
   // Verificar actualización automática al iniciar la aplicación (con pequeño retraso)
   setTimeout(() => {
-    verificarYActualizar().catch(error => {
-      console.error('Error al verificar la actualización:', error.message);
+    verificarYActualizar().catch((error) => {
+      console.error("Error al verificar la actualización:", error.message);
     });
   }, 1000);
 
-  app.on('activate', () => {
+  app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       crearVentana();
     }
@@ -92,8 +105,8 @@ app.whenReady().then(() => {
 });
 
 // Salir de la aplicación cuando todas las ventanas estén cerradas
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
     app.quit();
   }
 });
@@ -101,7 +114,7 @@ app.on('window-all-closed', () => {
 // Canales de comunicación IPC (Inter-Process Communication)
 
 // 1. Iniciar sesión y validar en red Z
-ipcMain.handle('iniciar-sesion', async (evento, datos) => {
+ipcMain.handle("iniciar-sesion", async (evento, datos) => {
   const { usuario, pin } = datos;
   const respuesta = await validarUsuario(usuario, pin);
   if (respuesta.exito) {
@@ -109,74 +122,80 @@ ipcMain.handle('iniciar-sesion', async (evento, datos) => {
       id: respuesta.usuario.id,
       NombreUsuario: respuesta.usuario.nombreUsuario,
       NombreCompleto: respuesta.usuario.nombreCompleto,
-      Turno: respuesta.usuario.turno
+      Turno: respuesta.usuario.turno,
     };
   }
   return respuesta;
 });
 
 // 2. Cerrar sesión activa
-ipcMain.handle('cerrar-sesion', () => {
+ipcMain.handle("cerrar-sesion", () => {
   usuarioActivo = null;
   return { exito: true };
 });
 
 // 3. Obtener la lista de PDFs del capturista desde la unidad Z
-ipcMain.handle('obtener-pdfs', async () => {
+ipcMain.handle("obtener-pdfs", async () => {
   return await obtenerPdfsDeRed(usuarioActivo);
 });
 
 // 4. Renombrar un archivo PDF de forma real en la unidad de red
-ipcMain.handle('renombrar-pdf', async (evento, datos) => {
+ipcMain.handle("renombrar-pdf", async (evento, datos) => {
   const { rutaOriginal, nuevoNombre } = datos;
   const respuesta = await renombrarArchivoPdf(rutaOriginal, nuevoNombre);
   if (respuesta.exito && usuarioActivo) {
     try {
       const archivoOriginal = path.basename(rutaOriginal);
       const archivoNuevo = `${nuevoNombre}.pdf`;
-      const directorio = path.dirname(rutaOriginal).replace(/\\/g, '/');
+      const directorio = path.dirname(rutaOriginal).replace(/\\/g, "/");
 
       await reportarAuditoria({
         userId: usuarioActivo.id,
         usuario: usuarioActivo.NombreUsuario,
         turno: usuarioActivo.Turno,
-        categoria: 'Libros',
+        categoria: "Libros",
         directorio: directorio,
-        accion: 'Renombrar',
+        accion: "Renombrar",
         archivoOriginal: archivoOriginal,
         archivoNuevo: archivoNuevo,
         detalles: `Archivo renombrado de ${archivoOriginal} a ${archivoNuevo}`,
-        paginas: 0
+        paginas: 0,
       });
     } catch (errorAuditoria) {
-      console.error('Error al registrar la auditoría de renombrado:', errorAuditoria);
+      console.error(
+        "Error al registrar la auditoría de renombrado:",
+        errorAuditoria,
+      );
     }
   }
   return respuesta;
 });
 
 // 5. Cortar/Extraer páginas seleccionadas y crear un nuevo PDF real en red
-ipcMain.handle('cortar-paginas-pdf', async (evento, datos) => {
+ipcMain.handle("cortar-paginas-pdf", async (evento, datos) => {
   const { rutaOriginal, paginas, nombreSalida } = datos;
   const respuesta = await cortarPaginasPdf(rutaOriginal, paginas, nombreSalida);
   if (respuesta.exito && usuarioActivo) {
     try {
       const archivoOriginal = path.basename(rutaOriginal);
       const archivoNuevo = `${nombreSalida}.pdf`;
-      const directorio = path.dirname(rutaOriginal).replace(/\\/g, '/');
+      const directorio = path.dirname(rutaOriginal).replace(/\\/g, "/");
 
       // Registrar acción: Cortar (indica la hoja o grupo de hojas cortadas del PDF original)
       await reportarAuditoria({
         userId: usuarioActivo.id,
         usuario: usuarioActivo.NombreUsuario,
         turno: usuarioActivo.Turno,
-        categoria: 'Libros',
+        categoria: "Libros",
         directorio: directorio,
-        accion: 'Cortar',
+        accion: "Cortar",
         archivoOriginal: archivoOriginal,
         archivoNuevo: null,
-        detalles: paginas.length === 1 ? `Se cortó la hoja ${paginas[0]}` : `Se cortaron las hojas: ${paginas.join(', ')}`,
-        paginas: paginas.length
+        detalles:
+          paginas.length === 1
+            ? `Se cortó la hoja ${paginas[0]}`
+            : `Se cortaron las hojas: ${paginas.join(", ")}`,
+        paginas: paginas.length,
       });
 
       // Registrar acción: Crear PDF (indica la creación física del nuevo archivo)
@@ -184,44 +203,57 @@ ipcMain.handle('cortar-paginas-pdf', async (evento, datos) => {
         userId: usuarioActivo.id,
         usuario: usuarioActivo.NombreUsuario,
         turno: usuarioActivo.Turno,
-        categoria: 'Libros',
+        categoria: "Libros",
         directorio: directorio,
-        accion: 'Crear PDF',
+        accion: "Crear PDF",
         archivoOriginal: archivoOriginal,
         archivoNuevo: archivoNuevo,
         detalles: `Creación de nuevo PDF: ${archivoNuevo}`,
-        paginas: paginas.length
+        paginas: paginas.length,
       });
     } catch (errorAuditoria) {
-      console.error('Error al registrar la auditoría de corte/creación:', errorAuditoria);
+      console.error(
+        "Error al registrar la auditoría de corte/creación:",
+        errorAuditoria,
+      );
     }
   }
   return respuesta;
 });
 
 // 6. Recortar físicamente los márgenes de una página específica en red
-ipcMain.handle('recortar-margenes-pdf', async (evento, datos) => {
+ipcMain.handle("recortar-margenes-pdf", async (evento, datos) => {
   const { rutaOriginal, numPagina, x, y, ancho, alto } = datos;
-  const respuesta = await recortarMargenesPagina(rutaOriginal, numPagina, x, y, ancho, alto);
+  const respuesta = await recortarMargenesPagina(
+    rutaOriginal,
+    numPagina,
+    x,
+    y,
+    ancho,
+    alto,
+  );
   if (respuesta.exito && usuarioActivo) {
     try {
       const archivoOriginal = path.basename(rutaOriginal);
-      const directorio = path.dirname(rutaOriginal).replace(/\\/g, '/');
+      const directorio = path.dirname(rutaOriginal).replace(/\\/g, "/");
 
       await reportarAuditoria({
         userId: usuarioActivo.id,
         usuario: usuarioActivo.NombreUsuario,
         turno: usuarioActivo.Turno,
-        categoria: 'Libros',
+        categoria: "Libros",
         directorio: directorio,
-        accion: 'Recortar',
+        accion: "Recortar",
         archivoOriginal: archivoOriginal,
         archivoNuevo: null,
         detalles: `Recorte de márgenes en página ${numPagina}. Coordenadas: x=${x.toFixed(2)}, y=${y.toFixed(2)}, ancho=${ancho.toFixed(2)}, alto=${alto.toFixed(2)}`,
-        paginas: 1
+        paginas: 1,
       });
     } catch (errorAuditoria) {
-      console.error('Error al registrar la auditoría de recorte:', errorAuditoria);
+      console.error(
+        "Error al registrar la auditoría de recorte:",
+        errorAuditoria,
+      );
     }
   }
   return respuesta;
