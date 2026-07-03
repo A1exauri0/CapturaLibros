@@ -7,7 +7,13 @@ const { PDFDocument } = require('pdf-lib');
  */
 async function cortarPaginasPdf(rutaOriginal, paginas, nombreSalida) {
   try {
-    const carpetaSalida = path.dirname(rutaOriginal);
+    const carpetaSalida = "\\\\172.40.5.84\\irec\\CALIDAD_LIBROS";
+    
+    // Asegurar que la carpeta CALIDAD_LIBROS exista
+    if (!fs.existsSync(carpetaSalida)) {
+      fs.mkdirSync(carpetaSalida, { recursive: true });
+    }
+
     const rutaDestino = path.join(carpetaSalida, `${nombreSalida}.pdf`).replace(/\\/g, '/');
 
     if (!paginas || paginas.length === 0) {

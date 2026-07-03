@@ -1,6 +1,4 @@
-const { URL_BASE } = require("../config/config");
-
-const URL_API_LOGIN = `${URL_BASE}/api/login`;
+const URL_API_LOGIN = "https://app.astronmx.cloud/api/login";
 
 /**
  * Valida las credenciales de un capturista contra el servidor central de Stellum

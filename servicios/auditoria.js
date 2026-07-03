@@ -1,7 +1,5 @@
 const os = require("os");
-const { URL_BASE } = require("../config/config");
-
-const URL_API_AUDITORIA = `${URL_BASE}/api/registro-libros`;
+const URL_API_AUDITORIA = "https://app.astronmx.cloud/api/registro-libros";
 
 /**
  * Envía un registro de auditoría al servidor central de Stellum.

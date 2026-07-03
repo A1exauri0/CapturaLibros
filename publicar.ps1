@@ -20,48 +20,55 @@ if (-not $version) {
 
 Write-Host "Versión de la aplicación detectada: $version"
 Write-Host ""
-Write-Host "Copiando archivos compilados a la red ($rutaRed)..."
+
+# Generar ruta del instalador local
+$instaladorLocal = "dist\CapturaLibros Setup $version.exe"
+if (-not (Test-Path $instaladorLocal)) {
+    Write-Host "[ERROR] No se encontró el instalador compilado '$instaladorLocal'." -ForegroundColor Red
+    Write-Host "Por favor, compile la aplicación primero con: pnpm run build" -ForegroundColor Yellow
+    exit 1
+}
 
 # Intentar crear el directorio de red si no existe
 if (-not (Test-Path $rutaRed)) {
     try {
         New-Item -ItemType Directory -Force -Path $rutaRed | Out-Null
     } catch {
-        Write-Host "[ADVERTENCIA] No se pudo crear la ruta de red automáticamente. Intentando copiar directamente..." -ForegroundColor Yellow
+        Write-Host "[ADVERTENCIA] No se pudo crear la ruta de red automáticamente." -ForegroundColor Yellow
     }
 }
 
-# Definir origen de datos para la copia
-# Exigir que la aplicación esté empaquetada en dist/win-unpacked
-if (-not (Test-Path "dist\win-unpacked")) {
-    Write-Host "[ERROR] No se encontró la carpeta compilada 'dist\win-unpacked'." -ForegroundColor Red
-    Write-Host "Por favor, compila la aplicación ejecutando primero el comando: pnpm run build" -ForegroundColor Yellow
-    Write-Host "Publicación cancelada." -ForegroundColor Red
-    exit 1
+# Limpiar archivos viejos de forma tolerante a bloqueos
+Write-Host "Limpiando archivos antiguos de la red..."
+if (Test-Path $rutaRed) {
+    $elementosRed = Get-ChildItem -Path $rutaRed
+    foreach ($item in $elementosRed) {
+        # Ignorar version.txt y el instalador estático
+        if ($item.Name -ne "version.txt" -and $item.Name -ne "CapturaLibros Setup.exe") {
+            try {
+                Remove-Item -Path $item.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            } catch {
+                # Ignorar error
+            }
+        }
+    }
 }
 
-$rutaOrigen = "dist\win-unpacked"
-$exclusionesDirectorio = @()
+Write-Host "Copiando el instalador a la red..."
+$instaladorDestino = "$rutaRed\CapturaLibros Setup.exe"
 
-# Configurar argumentos de robocopy
-$argumentosRobocopy = @($rutaOrigen, $rutaRed, "/E", "/PURGE", "/R:2", "/W:2")
-
-if ($exclusionesDirectorio.Count -gt 0) {
-    $argumentosRobocopy += "/XD"
-    $argumentosRobocopy += $exclusionesDirectorio
-}
-
-$argumentosRobocopy += "/XF"
-$argumentosRobocopy += "publicar.bat"
-$argumentosRobocopy += "publicar.ps1"
-
-# Ejecutar la copia recursiva con robocopy
-robocopy @argumentosRobocopy
-$exitCode = $LASTEXITCODE
-
-if ($exitCode -ge 8) {
-    Write-Host "[ERROR] Ocurrió un error al copiar los archivos a la red mediante robocopy. Código de salida: $exitCode" -ForegroundColor Red
-    exit 1
+# Intentar copiar el instalador. Si está bloqueado, probamos con otro nombre o sobrescribimos
+try {
+    Copy-Item -Path $instaladorLocal -Destination $instaladorDestino -Force -ErrorAction SilentlyContinue
+} catch {
+    Write-Host "[ADVERTENCIA] 'CapturaLibros Setup.exe' de red está en uso. Creando copia alternativa..." -ForegroundColor Yellow
+    $instaladorDestino = "$rutaRed\CapturaLibros Setup $version.exe"
+    try {
+        Copy-Item -Path $instaladorLocal -Destination $instaladorDestino -Force -ErrorAction SilentlyContinue
+    } catch {
+        Write-Host "[ERROR] No se pudo copiar el instalador a la red de ninguna forma." -ForegroundColor Red
+        exit 1
+    }
 }
 
 # Crear o actualizar archivo version.txt en red
@@ -74,4 +81,3 @@ try {
     Write-Host "[ERROR] No se pudo crear el archivo version.txt en la red." -ForegroundColor Red
     exit 1
 }
-Write-Host ""

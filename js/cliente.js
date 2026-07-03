@@ -71,6 +71,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const modalErrorMensaje = document.getElementById("modal-error-mensaje");
   const modalErrorTexto = document.getElementById("modal-error-texto");
 
+  // Elementos de bloqueo por colisión de sesión
+  const bloqueoColisionOverlay = document.getElementById("bloqueo-colision-overlay");
+  const bloqueoColisionTexto = document.getElementById("bloqueo-colision-texto");
+  const btnBloqueoReintentar = document.getElementById("btn-bloqueo-reintentar");
+  const btnBloqueoSalir = document.getElementById("btn-bloqueo-salir");
+
   // Estado local de la aplicación
   let archivosPdfs = [];
   let archivoSeleccionado = null;
@@ -218,6 +224,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         archivosPdfs = await window.apiProyecto.obtenerPDFs();
+
+        // Registrar sesión activa del lote en Stellum
+        if (archivosPdfs && archivosPdfs.length > 0 && typeof window.apiProyecto.registrarSesion === "function") {
+          const resSesion = await window.apiProyecto.registrarSesion({
+            rutaArchivo: archivosPdfs[0].rutaLocal
+          });
+
+          if (!resSesion.ok) {
+            // Lote en uso por otro capturista -> BLOQUEAR INTERFAZ
+            if (cargadorVisor) {
+              cargadorVisor.classList.add("oculto");
+            }
+            if (bloqueoColisionOverlay) {
+              bloqueoColisionOverlay.classList.remove("oculto");
+            }
+            if (bloqueoColisionTexto) {
+              bloqueoColisionTexto.textContent = resSesion.mensaje;
+            }
+            return; // Detener flujo
+          } else {
+            // Lote disponible -> Ocultar bloqueo si existiera
+            if (bloqueoColisionOverlay) {
+              bloqueoColisionOverlay.classList.add("oculto");
+            }
+          }
+        }
 
         // Ocultar cargador de búsqueda
         if (cargadorVisor) {
@@ -1211,6 +1243,50 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
   });
+
+  // Eventos de la pantalla de bloqueo por colisión
+  if (btnBloqueoReintentar) {
+    btnBloqueoReintentar.addEventListener("click", async () => {
+      await cargarListaPDFs();
+    });
+  }
+
+  if (btnBloqueoSalir) {
+    btnBloqueoSalir.addEventListener("click", async () => {
+      await cerrarSesionUsuario();
+    });
+  }
+
+  // Función para cerrar la sesión y regresar al login de forma limpia
+  async function cerrarSesionUsuario() {
+    if (
+      window.apiProyecto &&
+      typeof window.apiProyecto.liberarSesion === "function" &&
+      typeof window.apiProyecto.cerrarSesion === "function"
+    ) {
+      try {
+        await window.apiProyecto.liberarSesion();
+        await window.apiProyecto.cerrarSesion();
+      } catch (err) {
+        console.error("Error al liberar sesión en red:", err);
+      }
+    }
+
+    // Regresar visualmente al login
+    document.body.classList.add("en-login");
+    seccionLogin.classList.remove("oculto");
+    seccionCaptura.classList.add("oculto");
+
+    // Limpiar inputs
+    if (inputUsuario) inputUsuario.value = "";
+    if (inputContrasena) inputContrasena.value = "";
+    if (errorLogin) errorLogin.textContent = "";
+
+    // Ocultar bloqueo
+    if (bloqueoColisionOverlay) {
+      bloqueoColisionOverlay.classList.add("oculto");
+    }
+  }
 
   // Inicializar estado del menú lateral
   actualizarMenuLateral();

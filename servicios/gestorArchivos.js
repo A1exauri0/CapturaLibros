@@ -1,7 +1,11 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
-const RUTA_BASE_RPP = '\\\\172.40.5.84\\irec\\RESPALDO LIBROS TUXTLA NO TOCAR\\RPP';
+let baseSitioArchivos = "\\\\172.40.5.84\\irec\\";
+if (!baseSitioArchivos.endsWith("\\") && !baseSitioArchivos.endsWith("/")) {
+  baseSitioArchivos += "\\";
+}
+const RUTA_BASE_RPP = `${baseSitioArchivos}RESPALDO LIBROS TUXTLA NO TOCAR\\RPP`;
 
 /**
  * Obtiene la fecha actual en formato DD-MM-YY (Año a 2 dígitos)
@@ -9,8 +13,8 @@ const RUTA_BASE_RPP = '\\\\172.40.5.84\\irec\\RESPALDO LIBROS TUXTLA NO TOCAR\\R
  */
 function obtenerFechaHoy() {
   const hoy = new Date();
-  const dia = String(hoy.getDate()).padStart(2, '0');
-  const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+  const dia = String(hoy.getDate()).padStart(2, "0");
+  const mes = String(hoy.getMonth() + 1).padStart(2, "0");
   const anio = String(hoy.getFullYear()).slice(-2);
   return `${dia}-${mes}-${anio}`;
 }
@@ -34,7 +38,9 @@ function buscarDirectorioCapturista(nombreCompleto) {
       for (const cap of capturistas) {
         const rutaCap = path.join(rutaPC, cap);
         if (fs.statSync(rutaCap).isDirectory()) {
-          if (cap.trim().toLowerCase() === nombreCompleto.trim().toLowerCase()) {
+          if (
+            cap.trim().toLowerCase() === nombreCompleto.trim().toLowerCase()
+          ) {
             return rutaCap;
           }
         }
@@ -48,26 +54,26 @@ function buscarDirectorioCapturista(nombreCompleto) {
  * Crea la estructura JSON para el archivo PDF
  */
 function estructurarPdf(nombre, rutaCompleta, metadatos, capturista, fecha) {
-  let tomo = 'T01';
-  let anio = '2026';
-  
-  const partes = nombre.split('_');
+  let tomo = "T01";
+  let anio = "2026";
+
+  const partes = nombre.split("_");
   if (partes.length > 0) {
     if (partes[0].length === 4 && !isNaN(partes[0])) {
       anio = partes[0];
     }
   }
-  
+
   return {
-    id: nombre + '_' + metadatos.size + '_' + fecha,
+    id: nombre + "_" + metadatos.size + "_" + fecha,
     nombre: nombre,
-    rutaLocal: rutaCompleta.replace(/\\/g, '/'),
+    rutaLocal: rutaCompleta.replace(/\\/g, "/"),
     tamanioBytes: metadatos.size,
     procesado: false,
     tomo: tomo,
     anio: anio,
     capturista: capturista,
-    fecha: fecha
+    fecha: fecha,
   };
 }
 
@@ -80,7 +86,9 @@ function estructurarPdf(nombre, rutaCompleta, metadatos, capturista, fecha) {
 async function obtenerPdfsDeRed(usuarioActivo) {
   if (!usuarioActivo) return [];
   if (!fs.existsSync(RUTA_BASE_RPP)) {
-    console.error('El servicio de red (172.40.5.84) no está accesible al obtener PDFs.');
+    console.error(
+      "El servicio de red (172.40.5.84) no está accesible al obtener PDFs.",
+    );
     return [];
   }
 
@@ -88,8 +96,9 @@ async function obtenerPdfsDeRed(usuarioActivo) {
   const listaArchivos = [];
 
   try {
-    const esAdmin = usuarioActivo.NombreUsuario.toLowerCase() === 'admin' || 
-                    usuarioActivo.NombreCompleto.toLowerCase() === 'administrador';
+    const esAdmin =
+      usuarioActivo.NombreUsuario.toLowerCase() === "admin" ||
+      usuarioActivo.NombreCompleto.toLowerCase() === "administrador";
 
     if (esAdmin) {
       // El administrador ve todos los PDFs de todas las fechas y de todas las PC-XX
@@ -104,14 +113,21 @@ async function obtenerPdfsDeRed(usuarioActivo) {
               const subcarpetas = fs.readdirSync(rutaCapBase);
               for (const sub of subcarpetas) {
                 const rutaSub = path.join(rutaCapBase, sub);
-                if (fs.statSync(rutaSub).isDirectory() && /^\d{2}-\d{2}-\d{2,4}$/.test(sub)) {
+                if (
+                  fs.statSync(rutaSub).isDirectory() &&
+                  /^\d{2}-\d{2}-\d{2,4}$/.test(sub)
+                ) {
                   const archivos = fs.readdirSync(rutaSub);
-                  const pdfs = archivos.filter(f => f.toLowerCase().endsWith('.pdf'));
-                  
+                  const pdfs = archivos.filter((f) =>
+                    f.toLowerCase().endsWith(".pdf"),
+                  );
+
                   for (const nombre of pdfs) {
                     const rutaCompleta = path.join(rutaSub, nombre);
                     const metadatos = fs.statSync(rutaCompleta);
-                    listaArchivos.push(estructurarPdf(nombre, rutaCompleta, metadatos, cap, sub));
+                    listaArchivos.push(
+                      estructurarPdf(nombre, rutaCompleta, metadatos, cap, sub),
+                    );
                   }
                 }
               }
@@ -120,36 +136,80 @@ async function obtenerPdfsDeRed(usuarioActivo) {
         }
       }
     } else {
-      // Capturista normal: buscar su directorio y escanear todas las carpetas de fecha
-      const rutaCapturista = buscarDirectorioCapturista(usuarioActivo.NombreCompleto);
-      if (rutaCapturista) {
-        const subcarpetas = fs.readdirSync(rutaCapturista);
-        let carpetasEncontradas = 0;
+      // Capturista normal: escanear todas las carpetas de capturistas y fechas en la PC actual
+      const os = require("os");
+      const pcActual = os.hostname().toUpperCase();
+      const rutaPC = path.join(RUTA_BASE_RPP, pcActual);
 
-        for (const sub of subcarpetas) {
-          const rutaSub = path.join(rutaCapturista, sub);
-          if (fs.statSync(rutaSub).isDirectory() && /^\d{2}-\d{2}-\d{2,4}$/.test(sub)) {
-            carpetasEncontradas++;
-            const archivos = fs.readdirSync(rutaSub);
-            const pdfs = archivos.filter(f => f.toLowerCase().endsWith('.pdf'));
+      if (fs.existsSync(rutaPC) && fs.statSync(rutaPC).isDirectory()) {
+        const capturistas = fs.readdirSync(rutaPC);
+        for (const cap of capturistas) {
+          const rutaCapBase = path.join(rutaPC, cap);
+          if (fs.statSync(rutaCapBase).isDirectory()) {
+            const subcarpetas = fs.readdirSync(rutaCapBase);
+            for (const sub of subcarpetas) {
+              const rutaSub = path.join(rutaCapBase, sub);
+              if (
+                fs.statSync(rutaSub).isDirectory() &&
+                /^\d{2}-\d{2}-\d{2,4}$/.test(sub)
+              ) {
+                const archivos = fs.readdirSync(rutaSub);
+                const pdfs = archivos.filter((f) =>
+                  f.toLowerCase().endsWith(".pdf"),
+                );
 
-            for (const nombre of pdfs) {
-              const rutaCompleta = path.join(rutaSub, nombre);
-              const metadatos = fs.statSync(rutaCompleta);
-              listaArchivos.push(estructurarPdf(nombre, rutaCompleta, metadatos, usuarioActivo.NombreCompleto, sub));
+                for (const nombre of pdfs) {
+                  const rutaCompleta = path.join(rutaSub, nombre);
+                  const metadatos = fs.statSync(rutaCompleta);
+                  listaArchivos.push(
+                    estructurarPdf(nombre, rutaCompleta, metadatos, cap, sub),
+                  );
+                }
+              }
             }
           }
         }
+      } else {
+        // Fallback: Si el directorio de la PC actual no existe en red Z (desarrollo/testing),
+        // escaneamos todas las subcarpetas de todas las PC-XX registradas
+        console.warn(`Directorio de la PC actual (${pcActual}) no existe en red Z. Escaneando todas las PCs como fallback...`);
+        const pcs = fs.readdirSync(RUTA_BASE_RPP);
+        for (const pc of pcs) {
+          const rutaPcFallback = path.join(RUTA_BASE_RPP, pc);
+          if (fs.statSync(rutaPcFallback).isDirectory()) {
+            const capturistas = fs.readdirSync(rutaPcFallback);
+            for (const cap of capturistas) {
+              const rutaCapBase = path.join(rutaPcFallback, cap);
+              if (fs.statSync(rutaCapBase).isDirectory()) {
+                const subcarpetas = fs.readdirSync(rutaCapBase);
+                for (const sub of subcarpetas) {
+                  const rutaSub = path.join(rutaCapBase, sub);
+                  if (
+                    fs.statSync(rutaSub).isDirectory() &&
+                    /^\d{2}-\d{2}-\d{2,4}$/.test(sub)
+                  ) {
+                    const archivos = fs.readdirSync(rutaSub);
+                    const pdfs = archivos.filter((f) =>
+                      f.toLowerCase().endsWith(".pdf"),
+                    );
 
-        // Si no tiene carpetas de fechas, inicializar al menos la de hoy
-        if (carpetasEncontradas === 0) {
-          const rutaHoy = path.join(rutaCapturista, fechaHoy);
-          fs.mkdirSync(rutaHoy, { recursive: true });
+                    for (const nombre of pdfs) {
+                      const rutaCompleta = path.join(rutaSub, nombre);
+                      const metadatos = fs.statSync(rutaCompleta);
+                      listaArchivos.push(
+                        estructurarPdf(nombre, rutaCompleta, metadatos, cap, sub),
+                      );
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
   } catch (error) {
-    console.error('Error al escanear PDFs en red:', error);
+    console.error("Error al escanear PDFs en red:", error);
   }
 
   return listaArchivos;
@@ -161,16 +221,22 @@ async function obtenerPdfsDeRed(usuarioActivo) {
 async function renombrarArchivoPdf(rutaOriginal, nuevoNombre) {
   try {
     const carpetaSalida = path.dirname(rutaOriginal);
-    const rutaDestino = path.join(carpetaSalida, `${nuevoNombre}.pdf`).replace(/\\/g, '/');
+    const rutaDestino = path
+      .join(carpetaSalida, `${nuevoNombre}.pdf`)
+      .replace(/\\/g, "/");
 
     if (fs.existsSync(rutaDestino)) {
-      return { exito: false, mensaje: 'Ya existe un archivo con ese nombre.' };
+      return { exito: false, mensaje: "Ya existe un archivo con ese nombre." };
     }
 
     fs.renameSync(rutaOriginal, rutaDestino);
-    return { exito: true, mensaje: 'Archivo renombrado con éxito.', rutaDestino };
+    return {
+      exito: true,
+      mensaje: "Archivo renombrado con éxito.",
+      rutaDestino,
+    };
   } catch (error) {
-    console.error('Error al renombrar archivo en red:', error);
+    console.error("Error al renombrar archivo en red:", error);
     return { exito: false, mensaje: `Error al renombrar: ${error.message}` };
   }
 }
@@ -179,5 +245,5 @@ module.exports = {
   obtenerPdfsDeRed,
   renombrarArchivoPdf,
   buscarDirectorioCapturista,
-  obtenerFechaHoy
+  obtenerFechaHoy,
 };

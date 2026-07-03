@@ -15,11 +15,7 @@ const {
 } = require("./servicios/procesamientoPdf");
 const { reportarAuditoria } = require("./servicios/auditoria");
 const { verificarYActualizar } = require("./servicios/updater");
-
-// Cargar variables de entorno desde el archivo .env
-require("dotenv").config();
-
-const BASE_URL = process.env.URL_BASE;
+const URL_BASE = "https://app.astronmx.cloud";
 
 let usuarioActivo = null;
 
@@ -105,7 +101,17 @@ app.whenReady().then(() => {
 });
 
 // Salir de la aplicación cuando todas las ventanas estén cerradas
-app.on("window-all-closed", () => {
+app.on("window-all-closed", async () => {
+  if (usuarioActivo) {
+    const URL_API_SESION = `${URL_BASE}/api/libros/sesion`;
+    try {
+      await fetch(URL_API_SESION, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: usuarioActivo.id, liberar: true }),
+      });
+    } catch (e) {}
+  }
   if (process.platform !== "darwin") {
     app.quit();
   }
@@ -129,9 +135,105 @@ ipcMain.handle("iniciar-sesion", async (evento, datos) => {
 });
 
 // 2. Cerrar sesión activa
-ipcMain.handle("cerrar-sesion", () => {
+ipcMain.handle("cerrar-sesion", async () => {
+  if (usuarioActivo) {
+    const URL_API_SESION = `${URL_BASE}/api/libros/sesion`;
+    try {
+      await fetch(URL_API_SESION, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: usuarioActivo.id, liberar: true }),
+      });
+    } catch (e) {}
+  }
   usuarioActivo = null;
   return { exito: true };
+});
+
+// 2b. Registrar sesión del lote activo en Stellum
+ipcMain.handle("registrar-sesion", async (evento, datos) => {
+  if (!usuarioActivo) return { ok: false, mensaje: "No hay usuario activo." };
+
+  const { rutaArchivo } = datos;
+  const URL_API_SESION = `${URL_BASE}/api/libros/sesion`;
+
+  try {
+    const RUTA_BASE_RPP = "Z:/RESPALDO LIBROS TUXTLA NO TOCAR/RPP";
+    const carpetaLote = path.dirname(rutaArchivo).replace(/\\/g, "/");
+    const baseLimpia = RUTA_BASE_RPP.replace(/\\/g, "/");
+
+    let rutaRelativa = carpetaLote;
+    if (carpetaLote.toLowerCase().startsWith(baseLimpia.toLowerCase())) {
+      rutaRelativa = carpetaLote
+        .substring(baseLimpia.length)
+        .replace(/^\//, "");
+    }
+
+    const partes = rutaRelativa.split("/");
+    const lote = partes[partes.length - 1] || "Lote";
+    const os = require("os");
+
+    console.log("Registrando sesión de lote en Stellum:", {
+      user_id: usuarioActivo.id,
+      pc: os.hostname(),
+      directorio: baseLimpia,
+      lote: lote,
+      ruta_relativa: rutaRelativa,
+    });
+
+    const respuestaApi = await fetch(URL_API_SESION, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        user_id: usuarioActivo.id,
+        pc: os.hostname(),
+        directorio: baseLimpia,
+        lote: lote,
+        ruta_relativa: rutaRelativa,
+      }),
+    });
+
+    const res = await respuestaApi.json();
+
+    if (respuestaApi.ok && res.ok) {
+      return { ok: true, mensaje: res.mensaje };
+    } else {
+      return {
+        ok: false,
+        mensaje: res.mensaje || "El lote ya está ocupado por otro usuario.",
+        ocupado_por: res.ocupado_por,
+      };
+    }
+  } catch (error) {
+    console.error("Error al registrar sesión del lote:", error.message);
+    return { ok: true, mensaje: "Ignorado por error de red local." };
+  }
+});
+
+// 2c. Liberar sesión de lote en Stellum
+ipcMain.handle("liberar-sesion", async () => {
+  if (!usuarioActivo) return { ok: true };
+  const URL_API_SESION = `${URL_BASE}/api/libros/sesion`;
+  try {
+    await fetch(URL_API_SESION, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        user_id: usuarioActivo.id,
+        liberar: true,
+      }),
+    });
+    return { ok: true };
+  } catch (error) {
+    console.error("Error al liberar la sesión del lote:", error.message);
+    return { ok: true };
+  }
 });
 
 // 3. Obtener la lista de PDFs del capturista desde la unidad Z

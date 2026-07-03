@@ -206,6 +206,21 @@
     </div>
   </div>
 
+  <!-- Pantalla de Bloqueo por Colisión de Sesión -->
+  <div id="bloqueo-colision-overlay" class="modal-overlay oculto">
+    <div class="modal-contenido" style="text-align: center; max-width: 500px; gap: 24px;">
+      <iconify-icon icon="mdi:alert-decagram-outline" style="font-size: 64px; color: var(--color-error); margin: 0 auto;"></iconify-icon>
+      <h3 style="color: var(--color-error); font-size: 22px;">Lote en Uso</h3>
+      <p id="bloqueo-colision-texto" style="font-size: 14px; line-height: 1.6; color: var(--color-texto-principal);">
+        Este lote de PDFs está siendo trabajado actualmente por otro capturista.
+      </p>
+      <div style="display: flex; justify-content: center; gap: 16px; margin-top: 10px;">
+        <button id="btn-bloqueo-reintentar" class="btn-primario" style="padding: 12px 24px;">Reintentar Conexión</button>
+        <button id="btn-bloqueo-salir" class="btn-secundario" style="padding: 12px 24px;">Cerrar Sesión</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/cliente.js"></script>
 </body>
 </html>

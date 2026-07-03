@@ -1,19 +1,23 @@
 {
   "name": "captura-libros",
-  "version": "1.0.0",
+  "version": "1.0.14",
   "description": "Aplicación de captura y recorte de libros en formato PDF",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --dir"
+    "build": "electron-builder"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@pdf-lib/standard-fonts": "^1.0.0",
+    "@pdf-lib/upng": "^1.0.1",
     "axios": "^1.6.0",
     "dotenv": "^17.4.2",
-    "pdf-lib": "^1.17.1"
+    "pako": "^1.0.11",
+    "pdf-lib": "^1.17.1",
+    "tslib": "^2.6.2"
   },
   "devDependencies": {
     "electron": "^28.0.0",
@@ -31,8 +35,17 @@
       "output": "dist"
     },
     "win": {
-      "target": "dir",
+      "target": [
+        "nsis"
+      ],
       "icon": "assets/libros.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Captura Libros"
     },
     "files": [
       "**/*",

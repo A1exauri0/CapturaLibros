@@ -7,5 +7,7 @@ contextBridge.exposeInMainWorld('apiProyecto', {
   obtenerRutaArchivo: (rutaLocal) => `app-archivo:///${rutaLocal.replace(/\\/g, '/')}`,
   renombrarPDF: (datos) => ipcRenderer.invoke('renombrar-pdf', datos),
   cortarPaginasPDF: (datos) => ipcRenderer.invoke('cortar-paginas-pdf', datos),
-  recortarMargenesPDF: (datos) => ipcRenderer.invoke('recortar-margenes-pdf', datos)
+  recortarMargenesPDF: (datos) => ipcRenderer.invoke('recortar-margenes-pdf', datos),
+  registrarSesion: (datos) => ipcRenderer.invoke('registrar-sesion', datos),
+  liberarSesion: () => ipcRenderer.invoke('liberar-sesion')
 });
