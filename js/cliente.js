@@ -86,6 +86,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let paginaActiva = 1;
   let zoomActual = 1.0;
   let rotacionActual = 0;
+  let tareaRenderizadoActiva = null;
 
   // Modos de Trabajo: 'recortar' (Recorte geométrico) o 'crear' (Selección y extracción de hojas)
   let modoActual = "recortar";
@@ -93,6 +94,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Estado local de múltiples páginas seleccionadas para creación de PDF
   const paginasSeleccionadas = new Set();
   let miniaturasCargadasDocId = null;
+  let columnasRejilla = 2;
 
   // Estado local del dibujo de la caja de recorte
   let herramientaRecorteActiva = false;
@@ -320,7 +322,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     archivoSeleccionado = archivo;
 
     // Resetear selecciones
-    paginasSeleccionadas.clear();
+    limpiarSeleccionMiniaturas();
     miniaturasCargadasDocId = null;
     desactivarHerramientaRecorte();
 
@@ -394,6 +396,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Eliminar elementos de recorte antes de repintar la página
       eliminarElementosRecorte();
 
+      // Si hay una tarea de renderizado activa en proceso, la cancelamos de forma segura
+      if (tareaRenderizadoActiva) {
+        try {
+          tareaRenderizadoActiva.cancel();
+        } catch (e) {}
+      }
+
       const pagina = await pdfDocumento.getPage(numeroPagina);
       const contexto = canvasPdf.getContext("2d");
 
@@ -416,7 +425,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         viewport: viewport,
       };
 
-      await pagina.render(renderContext).promise;
+      // Guardamos la tarea de renderizado actual para poder cancelarla si el usuario interactúa rápido
+      tareaRenderizadoActiva = pagina.render(renderContext);
+
+      try {
+        await tareaRenderizadoActiva.promise;
+      } catch (renderError) {
+        // Si el renderizado fue cancelado por otra interacción, salimos sin error
+        if (renderError.name === "RenderingCancelledException") {
+          return;
+        }
+        throw renderError;
+      } finally {
+        tareaRenderizadoActiva = null;
+      }
 
       // Actualizar número de página
       pagActualTexto.textContent = numeroPagina;
@@ -549,6 +571,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function actualizarZoomRejilla() {
+    if (rejillaMiniaturasPdf) {
+      rejillaMiniaturasPdf.style.setProperty("--columnas-rejilla", columnasRejilla);
+      
+      let maxAnchoMin = 520;
+      let maxAnchoCan = 500;
+      let porcentaje = 100;
+
+      if (columnasRejilla === 1) {
+        maxAnchoMin = 1000;
+        maxAnchoCan = 980;
+        porcentaje = 150;
+      } else if (columnasRejilla === 2) {
+        maxAnchoMin = 650;
+        maxAnchoCan = 630;
+        porcentaje = 100;
+      } else if (columnasRejilla === 3) {
+        maxAnchoMin = 450;
+        maxAnchoCan = 430;
+        porcentaje = 75;
+      } else if (columnasRejilla === 4) {
+        maxAnchoMin = 320;
+        maxAnchoCan = 300;
+        porcentaje = 50;
+      } else if (columnasRejilla === 5) {
+        maxAnchoMin = 240;
+        maxAnchoCan = 220;
+        porcentaje = 35;
+      }
+
+      rejillaMiniaturasPdf.style.setProperty("--max-ancho-miniatura", `${maxAnchoMin}px`);
+      rejillaMiniaturasPdf.style.setProperty("--max-ancho-canvas-miniatura", `${maxAnchoCan}px`);
+
+      if (textoZoom) {
+        textoZoom.textContent = `${porcentaje}%`;
+      }
+    }
+  }
+
   function activarModo(modo) {
     modoActual = modo;
     desactivarHerramientaRecorte();
@@ -560,9 +621,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // Mostrar caja de recorte si existiera
       mostrarCajaRecorteElemento();
+      if (textoZoom) {
+        textoZoom.textContent = `${Math.round(zoomActual * 100)}%`;
+      }
     } else {
       contenedorLienzoPdf.classList.add("oculto");
-      visorControlesBarra.classList.add("oculto");
+      // Mantenemos la barra de controles visible en el modo de creación para reutilizar los botones de Zoom
+      visorControlesBarra.classList.remove("oculto");
+      // Pero ocultamos los botones de paginación y rotación que no sirven para la cuadrícula
+      if (btnAnt) btnAnt.style.display = "none";
+      if (btnSig) btnSig.style.display = "none";
+      const paginacionTexto = document.querySelector(".visor-paginacion");
+      if (paginacionTexto) paginacionTexto.style.display = "none";
+      if (btnRotar) btnRotar.style.display = "none";
+
       contenedorRejillaMiniaturas.classList.remove("oculto");
 
       // Ocultar la caja de recorte al salir
@@ -570,6 +642,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // Cargar rejilla
       cargarMiniaturasRejilla();
+      
+      // Sincronizar zoom de cuadrícula
+      actualizarZoomRejilla();
+    }
+
+    // Al regresar a recortar, restaurar la visibilidad de los controles de paginación y rotación
+    if (modo === "recortar") {
+      if (btnAnt) btnAnt.style.display = "";
+      if (btnSig) btnSig.style.display = "";
+      const paginacionTexto = document.querySelector(".visor-paginacion");
+      if (paginacionTexto) paginacionTexto.style.display = "";
+      if (btnRotar) btnRotar.style.display = "";
     }
 
     actualizarMenuLateral();
@@ -675,7 +759,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       `;
 
       rejillaMiniaturasPdf.appendChild(tarjeta);
-      renderizarMiniatura(i);
+
+      // Esperar a que la página se renderice de forma secuencial antes de pasar a la siguiente
+      await renderizarMiniatura(i);
 
       tarjeta.addEventListener("click", () => {
         toggleSeleccionHoja(i, tarjeta);
@@ -896,40 +982,64 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   async function aplicarZoomIn() {
-    if (zoomActual < 3.0) {
-      zoomActual = parseFloat((zoomActual + 0.15).toFixed(2));
-      textoZoom.textContent = `${Math.round(zoomActual * 100)}%`;
-      await renderizarPagina(paginaActiva);
+    if (modoActual === "crear") {
+      if (columnasRejilla > 1) {
+        columnasRejilla--;
+        actualizarZoomRejilla();
+      }
+    } else {
+      if (zoomActual < 3.0) {
+        zoomActual = parseFloat((zoomActual + 0.15).toFixed(2));
+        textoZoom.textContent = `${Math.round(zoomActual * 100)}%`;
+        await renderizarPagina(paginaActiva);
+      }
     }
   }
 
   async function aplicarZoomOut() {
-    if (zoomActual > 0.4) {
-      zoomActual = parseFloat((zoomActual - 0.15).toFixed(2));
-      textoZoom.textContent = `${Math.round(zoomActual * 100)}%`;
-      await renderizarPagina(paginaActiva);
+    if (modoActual === "crear") {
+      if (columnasRejilla < 5) {
+        columnasRejilla++;
+        actualizarZoomRejilla();
+      }
+    } else {
+      if (zoomActual > 0.4) {
+        zoomActual = parseFloat((zoomActual - 0.15).toFixed(2));
+        textoZoom.textContent = `${Math.round(zoomActual * 100)}%`;
+        await renderizarPagina(paginaActiva);
+      }
     }
   }
 
   btnZoomIn.addEventListener("click", async () => {
-    if (zoomActual < 3.0) {
-      zoomActual = parseFloat((zoomActual + 0.25).toFixed(2));
-      textoZoom.textContent = `${Math.round(zoomActual * 100)}%`;
-      await renderizarPagina(paginaActiva);
-    }
+    await aplicarZoomIn();
   });
 
   btnZoomOut.addEventListener("click", async () => {
-    if (zoomActual > 0.4) {
-      zoomActual = parseFloat((zoomActual - 0.25).toFixed(2));
-      textoZoom.textContent = `${Math.round(zoomActual * 100)}%`;
-      await renderizarPagina(paginaActiva);
-    }
+    await aplicarZoomOut();
   });
 
   // Vincular eventos de scroll con la tecla Control para el zoom interactivo
   if (contenedorLienzoPdf) {
     contenedorLienzoPdf.addEventListener(
+      "wheel",
+      (e) => {
+        if (e.ctrlKey) {
+          e.preventDefault();
+          if (e.deltaY < 0) {
+            aplicarZoomIn();
+          } else {
+            aplicarZoomOut();
+          }
+        }
+      },
+      { passive: false },
+    );
+  }
+
+  // Vincular eventos de scroll con la tecla Control en la cuadrícula de miniaturas
+  if (contenedorRejillaMiniaturas) {
+    contenedorRejillaMiniaturas.addEventListener(
       "wheel",
       (e) => {
         if (e.ctrlKey) {
@@ -956,9 +1066,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   function actualizarReglaEjemplo() {
     textoReglaEjemplo.innerHTML = `
       Regla de Renombrado activa:
-      <code>Solo números (hasta 5 dígitos)</code>
+      <code>Exactamente 4 dígitos numéricos</code>
       <br>Ejemplo sugerido:
-      <code>12345</code> o <code>00123</code>
+      <code>0345</code> o <code>1234</code>
     `;
   }
 
@@ -1123,11 +1233,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!archivoSeleccionado) return;
 
       const nuevoNombre = inputNuevoNombre ? inputNuevoNombre.value.trim() : "";
-      if (!/^\d{1,5}$/.test(nuevoNombre)) {
+      if (!/^\d{4}$/.test(nuevoNombre)) {
         // Mostrar mensaje de error estético en el modal
         if (modalErrorMensaje && modalErrorTexto) {
           modalErrorTexto.textContent =
-            "El nombre debe contener únicamente números y tener un máximo de 5 dígitos (ej: 00123).";
+            "El nombre debe contener exactamente 4 dígitos numéricos (ej: 0345).";
           modalErrorMensaje.classList.remove("oculto");
         }
 
@@ -1179,14 +1289,8 @@ document.addEventListener("DOMContentLoaded", async () => {
               "¡Nuevo archivo PDF creado con éxito con las páginas seleccionadas!",
             );
 
-            // Limpiar selecciones
-            paginasSeleccionadas.clear();
-            actualizarMenuLateral();
-
-            // Refrescar cuadrícula
-            document
-              .querySelectorAll(".tarjeta-miniatura")
-              .forEach((t) => t.classList.remove("seleccionada"));
+            // Limpiar selecciones y refrescar cuadrícula
+            limpiarSeleccionMiniaturas();
 
             // Recargar cola de archivos
             await cargarListaPDFs();
@@ -1220,9 +1324,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function limpiarSeleccionMiniaturas() {
+    paginasSeleccionadas.clear();
+    document.querySelectorAll(".tarjeta-miniatura").forEach((t) => {
+      t.classList.remove("seleccionada");
+    });
+    actualizarMenuLateral();
+  }
+
   if (btnMenuCancelarCrear) {
     btnMenuCancelarCrear.addEventListener("click", () => {
-      paginasSeleccionadas.clear();
+      limpiarSeleccionMiniaturas();
       activarModo("recortar");
     });
   }
@@ -1235,7 +1347,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         alternarHerramientaRecorte(false);
       } else if (modoActual === "crear") {
         evento.preventDefault();
-        paginasSeleccionadas.clear();
+        limpiarSeleccionMiniaturas();
         activarModo("recortar");
       } else if (modalCrearPdf && !modalCrearPdf.classList.contains("oculto")) {
         evento.preventDefault();

@@ -1,6 +1,6 @@
 {
   "name": "captura-libros",
-  "version": "1.0.14",
+  "version": "1.0.22",
   "description": "Aplicación de captura y recorte de libros en formato PDF",
   "main": "main.js",
   "scripts": {

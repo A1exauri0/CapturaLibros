@@ -78,6 +78,31 @@ function estructurarPdf(nombre, rutaCompleta, metadatos, capturista, fecha) {
 }
 
 /**
+ * Consulta las sesiones activas en Stellum para obtener los lotes en uso por otros usuarios.
+ * @returns {Promise<Set<string>>} Conjunto de rutas relativas ocupadas en minúsculas.
+ */
+async function obtenerSesionesOcupadas() {
+  try {
+    const respuesta = await fetch("https://app.astronmx.cloud/api/libros/sesiones", {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+    if (respuesta.ok) {
+      const data = await respuesta.json();
+      if (data && data.ok && Array.isArray(data.sesiones)) {
+        return new Set(
+          data.sesiones.map((s) => (s.pc ? s.pc.toLowerCase().replace(/\\/g, "/") : ""))
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Error al consultar sesiones ocupadas en Stellum:", error.message);
+  }
+  return new Set();
+}
+
 /**
  * Obtiene la lista de PDFs de la red según el usuario activo y todas las carpetas de fecha
  * @param {object} usuarioActivo Usuario activo logueado en la app
@@ -92,7 +117,6 @@ async function obtenerPdfsDeRed(usuarioActivo) {
     return [];
   }
 
-  const fechaHoy = obtenerFechaHoy();
   const listaArchivos = [];
 
   try {
@@ -110,6 +134,21 @@ async function obtenerPdfsDeRed(usuarioActivo) {
           for (const cap of capturistas) {
             const rutaCapBase = path.join(rutaPC, cap);
             if (fs.statSync(rutaCapBase).isDirectory()) {
+              // Estructura de 2 niveles (ej: Libros/01-06-26)
+              if (/^\d{2}-\d{2}-\d{2,4}$/.test(cap)) {
+                const archivos = fs.readdirSync(rutaCapBase);
+                const pdfs = archivos.filter((f) => f.toLowerCase().endsWith(".pdf"));
+                for (const nombre of pdfs) {
+                  const rutaCompleta = path.join(rutaCapBase, nombre);
+                  const metadatos = fs.statSync(rutaCompleta);
+                  listaArchivos.push(
+                    estructurarPdf(nombre, rutaCompleta, metadatos, pc, cap),
+                  );
+                }
+                continue;
+              }
+
+              // Estructura de 3 niveles (ej: PC-01/Nombre/01-06-26)
               const subcarpetas = fs.readdirSync(rutaCapBase);
               for (const sub of subcarpetas) {
                 const rutaSub = path.join(rutaCapBase, sub);
@@ -136,75 +175,87 @@ async function obtenerPdfsDeRed(usuarioActivo) {
         }
       }
     } else {
-      // Capturista normal: escanear todas las carpetas de capturistas y fechas en la PC actual
-      const os = require("os");
-      const pcActual = os.hostname().toUpperCase();
-      const rutaPC = path.join(RUTA_BASE_RPP, pcActual);
+      // Capturista normal: buscar el primer lote libre disponible en la red
+      console.log("Buscando primer lote libre disponible en red Z...");
+      const sesionesOcupadas = await obtenerSesionesOcupadas();
+      
+      const pcs = fs.readdirSync(RUTA_BASE_RPP);
+      let loteEncontrado = null;
 
-      if (fs.existsSync(rutaPC) && fs.statSync(rutaPC).isDirectory()) {
+      for (const pc of pcs) {
+        if (loteEncontrado) break;
+        const rutaPC = path.join(RUTA_BASE_RPP, pc);
+        if (!fs.statSync(rutaPC).isDirectory()) continue;
+
         const capturistas = fs.readdirSync(rutaPC);
         for (const cap of capturistas) {
-          const rutaCapBase = path.join(rutaPC, cap);
-          if (fs.statSync(rutaCapBase).isDirectory()) {
-            const subcarpetas = fs.readdirSync(rutaCapBase);
-            for (const sub of subcarpetas) {
-              const rutaSub = path.join(rutaCapBase, sub);
-              if (
-                fs.statSync(rutaSub).isDirectory() &&
-                /^\d{2}-\d{2}-\d{2,4}$/.test(sub)
-              ) {
-                const archivos = fs.readdirSync(rutaSub);
-                const pdfs = archivos.filter((f) =>
-                  f.toLowerCase().endsWith(".pdf"),
-                );
+          if (loteEncontrado) break;
+          const rutaCap = path.join(rutaPC, cap);
+          if (!fs.statSync(rutaCap).isDirectory()) continue;
 
-                for (const nombre of pdfs) {
-                  const rutaCompleta = path.join(rutaSub, nombre);
-                  const metadatos = fs.statSync(rutaCompleta);
-                  listaArchivos.push(
-                    estructurarPdf(nombre, rutaCompleta, metadatos, cap, sub),
-                  );
-                }
-              }
+          // Estructura de 2 niveles (ej: Libros/01-06-26)
+          if (/^\d{2}-\d{2}-\d{2,4}$/.test(cap)) {
+            const rutaRelativaLote = `${pc}/${cap}`.toLowerCase().replace(/\\/g, "/");
+
+            if (sesionesOcupadas.has(rutaRelativaLote)) {
+              console.log(`Lote omitido (ocupado en Stellum): ${rutaRelativaLote}`);
+              continue;
+            }
+
+            const archivos = fs.readdirSync(rutaCap);
+            const pdfs = archivos.filter((f) => f.toLowerCase().endsWith(".pdf"));
+
+            if (pdfs.length > 0) {
+              console.log(`¡Lote libre asignado al usuario (2 niveles)!: ${rutaRelativaLote}`);
+              loteEncontrado = {
+                rutaSub: rutaCap,
+                pdfs,
+                cap: pc,
+                sub: cap
+              };
+            }
+            continue;
+          }
+
+          // Estructura de 3 niveles (ej: PC-01/Nombre/01-06-26)
+          const subcarpetas = fs.readdirSync(rutaCap);
+          for (const sub of subcarpetas) {
+            if (loteEncontrado) break;
+            const rutaSub = path.join(rutaCap, sub);
+            if (!fs.statSync(rutaSub).isDirectory() || !/^\d{2}-\d{2}-\d{2,4}$/.test(sub)) continue;
+
+            // La ruta relativa de la sesión en Stellum se guarda como "PC-XX/Capturista/Lote"
+            const rutaRelativaLote = `${pc}/${cap}/${sub}`.toLowerCase().replace(/\\/g, "/");
+
+            // Excluir lotes ocupados en Stellum por otros usuarios
+            if (sesionesOcupadas.has(rutaRelativaLote)) {
+              console.log(`Lote omitido (ocupado en Stellum): ${rutaRelativaLote}`);
+              continue;
+            }
+
+            const archivos = fs.readdirSync(rutaSub);
+            const pdfs = archivos.filter((f) => f.toLowerCase().endsWith(".pdf"));
+
+            if (pdfs.length > 0) {
+              console.log(`¡Lote libre asignado al usuario (3 niveles)!: ${rutaRelativaLote}`);
+              loteEncontrado = {
+                rutaSub,
+                pdfs,
+                cap,
+                sub
+              };
             }
           }
         }
-      } else {
-        // Fallback: Si el directorio de la PC actual no existe en red Z (desarrollo/testing),
-        // escaneamos todas las subcarpetas de todas las PC-XX registradas
-        console.warn(`Directorio de la PC actual (${pcActual}) no existe en red Z. Escaneando todas las PCs como fallback...`);
-        const pcs = fs.readdirSync(RUTA_BASE_RPP);
-        for (const pc of pcs) {
-          const rutaPcFallback = path.join(RUTA_BASE_RPP, pc);
-          if (fs.statSync(rutaPcFallback).isDirectory()) {
-            const capturistas = fs.readdirSync(rutaPcFallback);
-            for (const cap of capturistas) {
-              const rutaCapBase = path.join(rutaPcFallback, cap);
-              if (fs.statSync(rutaCapBase).isDirectory()) {
-                const subcarpetas = fs.readdirSync(rutaCapBase);
-                for (const sub of subcarpetas) {
-                  const rutaSub = path.join(rutaCapBase, sub);
-                  if (
-                    fs.statSync(rutaSub).isDirectory() &&
-                    /^\d{2}-\d{2}-\d{2,4}$/.test(sub)
-                  ) {
-                    const archivos = fs.readdirSync(rutaSub);
-                    const pdfs = archivos.filter((f) =>
-                      f.toLowerCase().endsWith(".pdf"),
-                    );
+      }
 
-                    for (const nombre of pdfs) {
-                      const rutaCompleta = path.join(rutaSub, nombre);
-                      const metadatos = fs.statSync(rutaCompleta);
-                      listaArchivos.push(
-                        estructurarPdf(nombre, rutaCompleta, metadatos, cap, sub),
-                      );
-                    }
-                  }
-                }
-              }
-            }
-          }
+      if (loteEncontrado) {
+        for (const nombre of loteEncontrado.pdfs) {
+          const rutaCompleta = path.join(loteEncontrado.rutaSub, nombre);
+          const metadatos = fs.statSync(rutaCompleta);
+          listaArchivos.push(
+            estructurarPdf(nombre, rutaCompleta, metadatos, loteEncontrado.cap, loteEncontrado.sub),
+          );
         }
       }
     }

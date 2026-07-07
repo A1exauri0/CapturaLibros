@@ -105,7 +105,7 @@ body {
   font-weight: 700;
   letter-spacing: -0.5px;
   background: var(--gradiente-primario);
-  -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -819,9 +819,10 @@ body.en-login #contenedor-aplicacion {
 
 .rejilla-miniaturas {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(var(--columnas-rejilla, 2), 1fr);
   gap: 16px;
   padding-bottom: 20px;
+  transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .tarjeta-miniatura {
@@ -838,7 +839,7 @@ body.en-login #contenedor-aplicacion {
   transition: var(--transicion-suave);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
   width: 100%;
-  max-width: 520px;
+  max-width: var(--max-ancho-miniatura, 520px);
   margin: 0 auto;
 }
 
@@ -857,7 +858,7 @@ body.en-login #contenedor-aplicacion {
 .tarjeta-miniatura canvas {
   width: 100% !important;
   height: auto !important;
-  max-width: 500px;
+  max-width: var(--max-ancho-canvas-miniatura, 500px);
   border-radius: 4px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.15);
   background: white;
@@ -1291,7 +1292,7 @@ body.en-login #contenedor-aplicacion {
   font-size: 20px;
   font-weight: 700;
   background: var(--gradiente-primario);
-  -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
